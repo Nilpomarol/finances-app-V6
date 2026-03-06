@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useAuthStore } from "@/store/authstore"
+import { useAuthStore } from "@/store/authStore"
 import { getUsers, validateUserPin } from "@/lib/db/queries/users"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"

@@ -1,5 +1,7 @@
-// Tipatge complet de l'esquema de la base de dades
-// S'emplenarà a la tasca 0.5
+// ============================================================
+// TIPUS DE LA BASE DE DADES — Finances App
+// Reflecteix exactament l'esquema SQL de Turso
+// ============================================================
 
 export interface User {
   id: string
@@ -54,6 +56,17 @@ export interface Event {
   eliminat: boolean
 }
 
+export interface EventTag {
+  id: string
+  user_id: string
+  tipus_esdeveniment: string
+  nom: string
+  color: string
+  icona: string
+  data_modificacio: number
+  eliminat: boolean
+}
+
 export interface Transaction {
   id: string
   user_id: string
@@ -91,13 +104,38 @@ export interface AssignmentRule {
   eliminat: boolean
 }
 
-export interface EventTag {
-  id: string
-  user_id: string
-  tipus_esdeveniment: string
+// ============================================================
+// TIPUS AUXILIARS (per a la UI)
+// ============================================================
+
+// Transacció amb les relacions ja resoltes (joins)
+export interface TransactionWithRelations extends Transaction {
+  compte_nom?: string
+  compte_color?: string
+  compte_desti_nom?: string
+  categoria_nom?: string
+  categoria_color?: string
+  categoria_icona?: string
+  esdeveniment_nom?: string
+  event_tag_nom?: string
+  persona_nom?: string // si és liquidació
+}
+
+// Resultat d'agrupació per categoria (per al dashboard)
+export interface CategorySummary {
+  categoria_id: string | null
   nom: string
   color: string
   icona: string
-  data_modificacio: number
-  eliminat: boolean
+  total: number
+  pressupost_mensual: number | null
+  percentatge_consumit: number | null
+}
+
+// KPIs del dashboard
+export interface DashboardKpis {
+  patrimoni_total: number
+  ingressos_mes: number
+  despeses_mes: number
+  flux_net: number
 }
