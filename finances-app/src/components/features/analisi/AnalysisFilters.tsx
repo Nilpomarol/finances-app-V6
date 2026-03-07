@@ -1,7 +1,7 @@
 import { Calendar, FilterX } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { useFilterStore } from "@/store/filterStore"
 import type { Account, Category } from "@/types/database"
 

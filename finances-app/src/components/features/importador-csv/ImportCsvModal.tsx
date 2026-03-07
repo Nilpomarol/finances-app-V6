@@ -3,14 +3,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { UploadCloud, ArrowRight, CheckCircle2 } from "lucide-react"
+import { UploadCloud, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react"
 import Papa from "papaparse"
 import { useToast } from "@/hooks/use-toast"
 import { useAuthStore } from "@/store/authStore"
-import { createTransaction } from "@/lib/db/queries/transactions"
+import { createTransaction, checkDuplicates, suggestCategory } from "@/lib/db/queries/transactions"
 import { now, formatEuros } from "@/lib/utils"
+import type { AssignmentRule, Transaction } from "@/types/database"
 
-// 1. Hem afegit rules aquí
+type CsvRow = Record<string, string | number | null | undefined>
+
+type ImportDraft = {
+  _id: string
+  concepte: string
+  data: number
+  import_trs: number
+  tipus: Transaction["tipus"]
+  categoria_id: string
+  esdeveniment_id: string | null
+  compte_id: string
+  compte_desti_id: string
+  notes: string
+  _isDuplicate: boolean
+  _excluded: boolean
+}
+
 interface ImportCsvModalProps {
   isOpen: boolean
   onClose: () => void
@@ -18,7 +35,7 @@ interface ImportCsvModalProps {
   accounts: { id: string, nom: string }[]
   categories: { id: string, nom: string, tipus: string }[]
   events: { id: string, nom: string }[]
-  rules: any[] 
+  rules: AssignmentRule[]
 }
 
 function parseCsvDate(dateStr: string): number {
@@ -31,20 +48,20 @@ function parseCsvDate(dateStr: string): number {
   return isNaN(d) ? now() : d
 }
 
-// 2. Hem afegit rules aquí per rebre-les!
-export default function ImportCsvModal({ 
-  isOpen, onClose, onSuccess, accounts, categories, events, rules 
+export default function ImportCsvModal({
+  isOpen, onClose, onSuccess, accounts, categories, events, rules
 }: ImportCsvModalProps) {
   const { userId } = useAuthStore()
   const { toast } = useToast()
-  
+
   const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [rawData, setRawData] = useState<any[]>([])
+  const [rawData, setRawData] = useState<CsvRow[]>([])
   const [headers, setHeaders] = useState<string[]>([])
   const [mapping, setMapping] = useState({ data: '', concepte: '', import: '' })
   const [selectedAccount, setSelectedAccount] = useState<string>('')
-  const [drafts, setDrafts] = useState<any[]>([])
+  const [drafts, setDrafts] = useState<ImportDraft[]>([])
   const [isSaving, setIsSaving] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const handleClose = () => {
     setStep(1)
@@ -70,7 +87,7 @@ export default function ImportCsvModal({
         }
         const detectedHeaders = results.meta.fields || []
         setHeaders(detectedHeaders)
-        setRawData(results.data)
+        setRawData(results.data as CsvRow[])
 
         const newMapping = { data: '', concepte: '', import: '' }
         detectedHeaders.forEach(h => {
@@ -85,7 +102,7 @@ export default function ImportCsvModal({
     })
   }
 
-  const handleProcessMapping = () => {
+  const handleProcessMapping = async () => {
     if (!mapping.data || !mapping.concepte || !mapping.import) {
       toast({ variant: "destructive", title: "Falten columnes per mapejar" })
       return
@@ -94,32 +111,58 @@ export default function ImportCsvModal({
       toast({ variant: "destructive", title: "Selecciona un compte de destí" })
       return
     }
+    if (!userId) return
 
-    const processed = rawData.map((row, index) => {
+    setIsProcessing(true)
+
+    const processed: ImportDraft[] = []
+    for (let index = 0; index < rawData.length; index++) {
+      const row = rawData[index]
       let amountStr = String(row[mapping.import] || '0')
       amountStr = amountStr.replace(/[^\d.,-]/g, '').replace(',', '.')
       const amount = parseFloat(amountStr) || 0
-      const tipus = amount >= 0 ? 'ingres' : 'despesa'
+      const tipus: ImportDraft["tipus"] = amount >= 0 ? 'ingres' : 'despesa'
       const concepte = row[mapping.concepte] || 'Sense concepte'
-      const concepteLower = concepte.toLowerCase()
+      const concepteText = String(concepte)
+      const concepteLower = concepteText.toLowerCase()
+      const parsedDate = parseCsvDate(String(row[mapping.data] ?? ""))
 
-      // Motor de Regles d'Assignació
+      // 1. Motor de Regles d'Assignació
       let assignedCategoryId = ''
-      
-      // Ara això funcionarà perfectament
-      if (tipus !== 'transferencia' && rules && rules.length > 0) {
+      if (rules.length > 0) {
         for (const rule of rules) {
           if (concepteLower.includes(rule.paraula_clau.toLowerCase())) {
             assignedCategoryId = rule.categoria_id
-            break 
+            break
           }
         }
       }
 
-      return {
+      // 2. Suggeriment per Historial (si no hi ha regla)
+      if (!assignedCategoryId) {
+        try {
+          const suggested = await suggestCategory(userId, concepteText)
+          if (suggested) {
+            assignedCategoryId = suggested
+          }
+        } catch (e) {
+          // Silenci - no bloqueja l'import si falla el suggeriment
+        }
+      }
+
+      // 3. Detecció de Duplicats
+      let isDuplicate = false
+      try {
+        const dupCheck = await checkDuplicates(userId, parsedDate, Math.abs(amount), concepteText)
+        isDuplicate = dupCheck.isDuplicate
+      } catch (e) {
+        // Silenci - no bloqueja l'import si falla la detecció
+      }
+
+      processed.push({
         _id: `draft-${index}`,
-        concepte: concepte,
-        data: parseCsvDate(row[mapping.data]),
+        concepte: concepteText,
+        data: parsedDate,
         import_trs: Math.abs(amount),
         tipus: tipus,
         categoria_id: assignedCategoryId,
@@ -127,24 +170,34 @@ export default function ImportCsvModal({
         compte_id: selectedAccount,
         compte_desti_id: '',
         notes: "Importat des de CSV",
-      }
-    })
+        _isDuplicate: isDuplicate,
+        _excluded: false,
+      })
+    }
 
     setDrafts(processed)
+    setIsProcessing(false)
     setStep(3)
   }
 
-  const updateDraft = (index: number, updates: Partial<any>) => {
+  const updateDraft = (index: number, updates: Partial<ImportDraft>) => {
     const newDrafts = [...drafts]
     newDrafts[index] = { ...newDrafts[index], ...updates }
+    setDrafts(newDrafts)
+  }
+
+  const toggleExclude = (index: number) => {
+    const newDrafts = [...drafts]
+    newDrafts[index] = { ...newDrafts[index], _excluded: !newDrafts[index]._excluded }
     setDrafts(newDrafts)
   }
 
   const handleSave = async () => {
     if (!userId) return
     setIsSaving(true)
+    const toSave = drafts.filter(d => !d._excluded)
     try {
-      for (const draft of drafts) {
+      for (const draft of toSave) {
         await createTransaction(userId, {
           concepte: draft.concepte,
           data: draft.data,
@@ -154,11 +207,13 @@ export default function ImportCsvModal({
           compte_desti_id: draft.tipus === 'transferencia' ? draft.compte_desti_id : null,
           categoria_id: draft.tipus !== 'transferencia' ? (draft.categoria_id || null) : null,
           esdeveniment_id: draft.esdeveniment_id || null,
+          event_tag_id: null,
+          liquidacio_persona_id: null,
           recurrent: false,
-          notes: draft.notes
+          notes: draft.notes ?? null,
         })
       }
-      toast({ title: "Importació completada amb èxit!" })
+      toast({ title: `${toSave.length} transaccions importades amb èxit!` })
       onSuccess()
     } catch (e) {
       toast({ variant: "destructive", title: "Error durant la importació" })
@@ -166,6 +221,9 @@ export default function ImportCsvModal({
       setIsSaving(false)
     }
   }
+
+  const duplicateCount = drafts.filter(d => d._isDuplicate && !d._excluded).length
+  const excludedCount = drafts.filter(d => d._excluded).length
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -197,7 +255,7 @@ export default function ImportCsvModal({
 
           {step === 2 && (
             <div className="space-y-6">
-              <div className="bg-blue-50 text-blue-800 p-4 rounded-md flex gap-3 text-sm">
+              <div className="bg-blue-50 text-blue-800 p-4 rounded-md flex gap-3 text-sm dark:bg-blue-950 dark:text-blue-200">
                 <CheckCircle2 className="w-5 h-5 shrink-0" />
                 <p>Hem detectat {rawData.length} files. Revisa que les columnes coincideixin.</p>
               </div>
@@ -205,26 +263,26 @@ export default function ImportCsvModal({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border p-4 rounded-lg bg-card">
                 <div>
                   <p className="text-sm font-medium mb-1">Columna Data</p>
-                  <Select value={mapping.data} onValueChange={(v) => setMapping({...mapping, data: v})}>
+                  <Select value={mapping.data} onValueChange={(v) => setMapping({ ...mapping, data: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div>
                   <p className="text-sm font-medium mb-1">Columna Concepte</p>
-                  <Select value={mapping.concepte} onValueChange={(v) => setMapping({...mapping, concepte: v})}>
+                  <Select value={mapping.concepte} onValueChange={(v) => setMapping({ ...mapping, concepte: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div>
                   <p className="text-sm font-medium mb-1">Columna Import</p>
-                  <Select value={mapping.import} onValueChange={(v) => setMapping({...mapping, import: v})}>
+                  <Select value={mapping.import} onValueChange={(v) => setMapping({ ...mapping, import: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="pt-4 mt-2 border-t col-span-1 sm:col-span-3">
                   <p className="text-sm font-bold mb-1">A quin compte bancari s'apliquen?</p>
                   <Select value={selectedAccount} onValueChange={setSelectedAccount}>
@@ -236,23 +294,47 @@ export default function ImportCsvModal({
                 </div>
               </div>
 
-              <Button onClick={handleProcessMapping} className="w-full">Processar Dades</Button>
+              <Button onClick={handleProcessMapping} className="w-full" disabled={isProcessing}>
+                {isProcessing ? "Processant i detectant duplicats..." : "Processar Dades"}
+              </Button>
             </div>
           )}
 
           {step === 3 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Pots editar els conceptes, assignar categories i viatges abans de guardar.</p>
-                <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
-                  {drafts.length} moviments
-                </span>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-sm text-muted-foreground">Pots editar, assignar categories i excloure duplicats abans de guardar.</p>
+                <div className="flex gap-2">
+                  <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
+                    {drafts.length - excludedCount} moviments
+                  </span>
+                  {duplicateCount > 0 && (
+                    <span className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      {duplicateCount} possibles duplicats
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {duplicateCount > 0 && (
+                <div className="bg-amber-50 text-amber-800 p-3 rounded-md flex gap-3 text-sm dark:bg-amber-950 dark:text-amber-200">
+                  <AlertTriangle className="w-5 h-5 shrink-0" />
+                  <div>
+                    <p className="font-medium">S'han detectat {duplicateCount} possibles duplicats</p>
+                    <p className="text-xs mt-1 opacity-80">
+                      Les files marcades en groc ja existeixen a la base de dades (mateixa data i import o concepte).
+                      Pots excloure-les clicant el botó ✕ o forçar la seva importació si són transaccions reals.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="border rounded-md max-h-[50vh] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-muted sticky top-0 z-10">
                     <tr>
+                      <th className="p-2 text-center font-medium w-10"></th>
                       <th className="p-2 text-left font-medium w-24">Data</th>
                       <th className="p-2 text-left font-medium">Concepte</th>
                       <th className="p-2 text-left font-medium w-32">Tipus</th>
@@ -263,19 +345,58 @@ export default function ImportCsvModal({
                   </thead>
                   <tbody>
                     {drafts.map((draft, index) => (
-                      <tr key={draft._id} className="border-t hover:bg-muted/30">
+                      <tr
+                        key={draft._id}
+                        className={`border-t transition-colors ${
+                          draft._excluded
+                            ? 'opacity-40 bg-muted/50 line-through'
+                            : draft._isDuplicate
+                              ? 'bg-amber-50/50 dark:bg-amber-950/20'
+                              : 'hover:bg-muted/30'
+                        }`}
+                      >
+                        <td className="p-2 text-center">
+                          {draft._isDuplicate && (
+                            <button
+                              onClick={() => toggleExclude(index)}
+                              className={`text-xs px-1.5 py-0.5 rounded font-medium transition-colors ${
+                                draft._excluded
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                  : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                              }`}
+                              title={draft._excluded ? "Incloure de nou" : "Excloure duplicat"}
+                            >
+                              {draft._excluded ? '↩' : '✕'}
+                            </button>
+                          )}
+                          {!draft._isDuplicate && !draft._excluded && (
+                            <button
+                              onClick={() => toggleExclude(index)}
+                              className="text-xs px-1.5 py-0.5 rounded text-muted-foreground hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
+                              title="Excloure"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </td>
                         <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">
                           {new Date(draft.data).toLocaleDateString()}
                         </td>
                         <td className="p-2">
-                          <Input 
-                            value={draft.concepte} 
-                            onChange={(e) => updateDraft(index, { concepte: e.target.value })}
-                            className="h-8 text-xs"
-                          />
+                          <div className="flex items-center gap-1">
+                            {draft._isDuplicate && !draft._excluded && (
+                              <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                            )}
+                            <Input
+                              value={draft.concepte}
+                              onChange={(e) => updateDraft(index, { concepte: e.target.value })}
+                              className="h-8 text-xs"
+                              disabled={draft._excluded}
+                            />
+                          </div>
                         </td>
                         <td className="p-2">
-                          <Select value={draft.tipus} onValueChange={(v) => updateDraft(index, { tipus: v, categoria_id: '', compte_desti_id: '' })}>
+                          <Select value={draft.tipus} onValueChange={(v) => updateDraft(index, { tipus: v as ImportDraft["tipus"], categoria_id: '', compte_desti_id: '' })} disabled={draft._excluded}>
                             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="despesa">Despesa</SelectItem>
@@ -286,7 +407,7 @@ export default function ImportCsvModal({
                         </td>
                         <td className="p-2">
                           {draft.tipus === 'transferencia' ? (
-                            <Select value={draft.compte_desti_id || "none"} onValueChange={(v) => updateDraft(index, { compte_desti_id: v === "none" ? "" : v })}>
+                            <Select value={draft.compte_desti_id || "none"} onValueChange={(v) => updateDraft(index, { compte_desti_id: v === "none" ? "" : v })} disabled={draft._excluded}>
                               <SelectTrigger className={`h-8 text-xs ${!draft.compte_desti_id ? 'border-red-300' : ''}`}>
                                 <SelectValue placeholder="Compte destí..." />
                               </SelectTrigger>
@@ -298,7 +419,7 @@ export default function ImportCsvModal({
                               </SelectContent>
                             </Select>
                           ) : (
-                            <Select value={draft.categoria_id || "none"} onValueChange={(v) => updateDraft(index, { categoria_id: v === "none" ? "" : v })}>
+                            <Select value={draft.categoria_id || "none"} onValueChange={(v) => updateDraft(index, { categoria_id: v === "none" ? "" : v })} disabled={draft._excluded}>
                               <SelectTrigger className={`h-8 text-xs ${!draft.categoria_id ? 'border-amber-300' : ''}`}>
                                 <SelectValue placeholder="Sense cat." />
                               </SelectTrigger>
@@ -312,7 +433,7 @@ export default function ImportCsvModal({
                           )}
                         </td>
                         <td className="p-2">
-                          <Select value={draft.esdeveniment_id || "none"} onValueChange={(v) => updateDraft(index, { esdeveniment_id: v === "none" ? null : v })}>
+                          <Select value={draft.esdeveniment_id || "none"} onValueChange={(v) => updateDraft(index, { esdeveniment_id: v === "none" ? null : v })} disabled={draft._excluded}>
                             <SelectTrigger className="h-8 text-xs">
                               <SelectValue placeholder="Cap viatge" />
                             </SelectTrigger>
@@ -338,7 +459,7 @@ export default function ImportCsvModal({
                   Tornar enrere
                 </Button>
                 <Button className="flex-1" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? "Guardant a la BD..." : "Confirmar i Importar"}
+                  {isSaving ? "Guardant a la BD..." : `Confirmar i Importar (${drafts.length - excludedCount})`}
                 </Button>
               </div>
             </div>

@@ -1,4 +1,3 @@
-import { useState } from "react"
 import type { Transaction, TransactionWithRelations } from "@/types/database"
 import { formatEuros, formatDate } from "@/lib/utils"
 import { cn } from "@/lib/utils"

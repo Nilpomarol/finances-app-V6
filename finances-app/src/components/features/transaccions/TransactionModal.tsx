@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useForm, useFieldArray } from "react-hook-form"
+import { useForm, useFieldArray, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 
@@ -15,6 +15,8 @@ import { createTransaction, updateTransaction, getTransactionSplits } from "@/li
 import { getEventTags } from "@/lib/db/queries/event-tags" // NOU: Importem la query de tags
 import { useAuthStore } from "@/store/authStore"
 import { now } from "@/lib/utils"
+import type { EventTag, TransactionWithRelations } from "@/types/database"
+import type { TransactionData } from "@/lib/db/queries/transactions"
 
 // 1. Esquema de validació actualitzat incloent esdeveniment_id i event_tag_id
 const formSchema = z.object({
@@ -54,12 +56,42 @@ const formSchema = z.object({
   }
 });
 
-type TransactionFormValues = z.infer<typeof formSchema>
+type TransactionFormValues = {
+  tipus: "ingres" | "despesa" | "transferencia"
+  concepte: string
+  import_trs: number
+  data: number
+  compte_id: string
+  compte_desti_id?: string
+  categoria_id?: string
+  esdeveniment_id?: string | null
+  event_tag_id?: string | null
+  notes?: string
+  recurrent: boolean
+  deutes: { persona_id: string; import_degut: number }[]
+  liquidacio_persona_id?: string | null
+}
+
+const defaultValues: TransactionFormValues = {
+  tipus: "despesa",
+  concepte: "",
+  import_trs: 0,
+  data: now(),
+  compte_id: "",
+  compte_desti_id: "",
+  categoria_id: "",
+  esdeveniment_id: null,
+  event_tag_id: null,
+  notes: "",
+  recurrent: false,
+  deutes: [],
+  liquidacio_persona_id: null,
+}
 
 interface TransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  transactionToEdit?: any;
+  transactionToEdit?: TransactionWithRelations;
   accounts: { id: string, nom: string }[];
   categories: { id: string, nom: string, tipus: string }[];
   people?: { id: string, nom: string }[]; 
@@ -76,16 +108,11 @@ export default function TransactionModal({
   const [isLoadingSplits, setIsLoadingSplits] = useState(false)
   
   // NOU: Estat per guardar les etiquetes de l'esdeveniment seleccionat
-  const [availableTags, setAvailableTags] = useState<any[]>([])
+  const [availableTags, setAvailableTags] = useState<EventTag[]>([])
 
   const form = useForm<TransactionFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      tipus: 'despesa', concepte: '', import_trs: 0, data: now(),
-      compte_id: '', compte_desti_id: '', categoria_id: '', 
-      esdeveniment_id: null, event_tag_id: null, // Assegurem que l'etiqueta sigui null
-      notes: '', recurrent: false, deutes: [], liquidacio_persona_id: null
-    },
+    resolver: zodResolver(formSchema) as Resolver<TransactionFormValues>,
+    defaultValues,
   })
 
   const { fields: deutesFields, append: addDeute, remove: removeDeute } = useFieldArray({
@@ -94,7 +121,7 @@ export default function TransactionModal({
   })
 
   const currentTipus = form.watch("tipus")
-  const currentImport = form.watch("import_trs") || 0
+  const currentImport = Number(form.watch("import_trs") ?? 0)
   const currentEventId = form.watch("esdeveniment_id") // NOU: Vigilem quin event està seleccionat
 
   // NOU: Efecte per carregar els tags quan canvia l'esdeveniment
@@ -154,7 +181,7 @@ export default function TransactionModal({
         })
       }
     } else if (isOpen) {
-      form.reset({ ...form.defaultValues, data: now() })
+      form.reset({ ...defaultValues, data: now() })
       setAvailableTags([]) // Resetejem tags al crear un de nou
     }
   }, [transactionToEdit, isOpen, form])
@@ -162,12 +189,29 @@ export default function TransactionModal({
   const onSubmit = async (values: TransactionFormValues) => {
     if (!user_id) return;
     try {
-      // Ajustem valors de "none" a null per a la base de dades
-      const finalValues = {
-        ...values,
+      // Ajustem valors opcionals i sentinelles de UI abans de desar.
+      const finalValues: TransactionData = {
+        concepte: values.concepte,
+        data: values.data,
+        import_trs: values.import_trs,
+        tipus: values.tipus,
+        compte_id: values.compte_id,
+        compte_desti_id:
+          values.tipus === "transferencia"
+            ? values.compte_desti_id || null
+            : null,
+        categoria_id:
+          values.tipus === "transferencia"
+            ? null
+            : values.categoria_id || null,
+        esdeveniment_id:
+          values.esdeveniment_id === "none" ? null : values.esdeveniment_id ?? null,
+        event_tag_id:
+          values.event_tag_id === "none" ? null : values.event_tag_id ?? null,
         liquidacio_persona_id: values.liquidacio_persona_id === "none" ? null : values.liquidacio_persona_id,
-        esdeveniment_id: values.esdeveniment_id === "none" ? null : values.esdeveniment_id,
-        event_tag_id: values.event_tag_id === "none" ? null : values.event_tag_id, // NOU: Parse de "none" a null
+        recurrent: values.recurrent ?? false,
+        notes: values.notes ?? null,
+        deutes: values.deutes ?? [],
       }
 
       if (transactionToEdit) {
@@ -222,7 +266,17 @@ export default function TransactionModal({
             <div className="flex gap-4">
               <FormField control={form.control} name="import_trs" render={({ field }) => (
                 <FormItem className="flex-1"><FormLabel>Import (€)</FormLabel>
-                  <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -338,7 +392,18 @@ export default function TransactionModal({
                     
                     <FormField control={form.control} name={`deutes.${index}.import_degut`} render={({ field }) => (
                       <FormItem className="w-24"><FormLabel className="text-xs">Import</FormLabel>
-                        <FormControl><Input type="number" step="0.01" className="h-9" {...field} /></FormControl>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className="h-9"
+                            value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        </FormControl>
                       </FormItem>
                     )} />
                     

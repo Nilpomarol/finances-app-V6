@@ -15,8 +15,21 @@ export interface GetTransactionsOptions {
   excludeEsdeveniments?: boolean
 }
 
-// Extenem la interfície per a la creació/edició
-export interface TransactionData extends Omit<Transaction, "id" | "user_id" | "data_modificacio" | "eliminat"> {
+// Tipus flexible per a la creació/edició. Les columnes nullable de la BD
+// no cal que es passin sempre perquè ja es normalitzen a null abans de desar.
+export interface TransactionData {
+  concepte: string
+  data: number
+  import_trs: number
+  notes?: string | null
+  compte_id: string
+  compte_desti_id?: string | null
+  categoria_id?: string | null
+  esdeveniment_id?: string | null
+  event_tag_id?: string | null
+  tipus: Transaction["tipus"]
+  recurrent?: boolean
+  liquidacio_persona_id?: string | null
   deutes?: { persona_id: string; import_degut: number }[]
 }
 
@@ -181,7 +194,24 @@ export async function createTransaction(
 
     await tx.commit() 
     const { deutes, ...txData } = data
-    return { id, user_id: userId, ...txData, data_modificacio: ts, eliminat: false }
+    return {
+      id,
+      user_id: userId,
+      concepte: txData.concepte,
+      data: txData.data,
+      import_trs: txData.import_trs,
+      notes: txData.notes ?? null,
+      compte_id: txData.compte_id,
+      compte_desti_id: txData.compte_desti_id ?? null,
+      categoria_id: txData.categoria_id ?? null,
+      esdeveniment_id: txData.esdeveniment_id ?? null,
+      event_tag_id: txData.event_tag_id ?? null,
+      tipus: txData.tipus,
+      recurrent: txData.recurrent ?? false,
+      liquidacio_persona_id: txData.liquidacio_persona_id ?? null,
+      data_modificacio: ts,
+      eliminat: false,
+    }
   } catch (error) {
     await tx.rollback() 
     throw error
@@ -278,7 +308,7 @@ export async function deleteTransaction(id: string, userId: string): Promise<voi
       sql: `SELECT compte_id, compte_desti_id FROM transactions WHERE id = ? AND user_id = ?`,
       args: [id, userId],
     })
-    
+
     if (current.rows.length === 0) throw new Error("Transacció no trobada")
 
     const currentTx = current.rows[0] as unknown as { compte_id: string; compte_desti_id: string | null }
@@ -296,10 +326,59 @@ export async function deleteTransaction(id: string, userId: string): Promise<voi
     })
 
     await updateAccountBalances(tx, currentTx.compte_id, currentTx.compte_desti_id, userId)
-    
+
     await tx.commit()
   } catch (error) {
     await tx.rollback()
     throw error
   }
+}
+
+/** Checks for potential duplicate transactions (same date AND (same amount OR same concept)) */
+export async function checkDuplicates(
+  userId: string,
+  data: number,
+  importTrs: number,
+  concepte: string
+): Promise<{ isDuplicate: boolean; matches: { id: string; concepte: string; import_trs: number; data: number }[] }> {
+  const db = getDb()
+  // Look for transactions with same date AND (same amount OR very similar concept)
+  const dayStart = new Date(data)
+  dayStart.setHours(0, 0, 0, 0)
+  const dayEnd = new Date(data)
+  dayEnd.setHours(23, 59, 59, 999)
+
+  const result = await db.execute({
+    sql: `SELECT id, concepte, import_trs, data FROM transactions
+          WHERE user_id = ? AND eliminat = false
+            AND data >= ? AND data <= ?
+            AND (import_trs = ? OR LOWER(concepte) = LOWER(?))`,
+    args: [userId, dayStart.getTime(), dayEnd.getTime(), importTrs, concepte],
+  })
+
+  const matches = result.rows as unknown as { id: string; concepte: string; import_trs: number; data: number }[]
+  return { isDuplicate: matches.length > 0, matches }
+}
+
+/** Suggests a category based on similar past transactions */
+export async function suggestCategory(
+  userId: string,
+  concepte: string
+): Promise<string | null> {
+  const db = getDb()
+  // Find the most common category for transactions with similar concepts
+  const result = await db.execute({
+    sql: `SELECT categoria_id, COUNT(*) as cnt
+          FROM transactions
+          WHERE user_id = ? AND eliminat = false
+            AND categoria_id IS NOT NULL
+            AND LOWER(concepte) LIKE ?
+          GROUP BY categoria_id
+          ORDER BY cnt DESC
+          LIMIT 1`,
+    args: [userId, `%${concepte.toLowerCase().substring(0, 10)}%`],
+  })
+
+  if (result.rows.length === 0) return null
+  return (result.rows[0] as unknown as { categoria_id: string }).categoria_id
 }

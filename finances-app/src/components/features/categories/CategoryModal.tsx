@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useAuthStore } from "@/store/authStore"
@@ -25,13 +25,27 @@ const categorySchema = z.object({
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Color invàlid"),
   icona: z.string().min(1, "Selecciona una icona"),
   pressupost_mensual: z.coerce
-    .number({ invalid_type_error: "Ha de ser un número" })
+    .number()
     .min(0)
     .nullable()
     .optional(),
 })
 
-type CategoryFormValues = z.infer<typeof categorySchema>
+type CategoryFormValues = {
+  nom: string
+  tipus: "despesa" | "ingres"
+  color: string
+  icona: string
+  pressupost_mensual?: number | null
+}
+
+const defaultValues: CategoryFormValues = {
+  nom: "",
+  tipus: "despesa",
+  color: "#6366f1",
+  icona: "tag",
+  pressupost_mensual: null,
+}
 
 const COLOR_PRESETS = [
   "#6366f1", "#8b5cf6", "#ec4899", "#ef4444",
@@ -54,10 +68,8 @@ export default function CategoryModal({
   const isEditing = !!category
 
   const form = useForm<CategoryFormValues>({
-    resolver: zodResolver(categorySchema),
-    defaultValues: {
-      nom: "", tipus: defaultTipus, color: "#6366f1", icona: "tag", pressupost_mensual: null,
-    },
+    resolver: zodResolver(categorySchema) as Resolver<CategoryFormValues>,
+    defaultValues: { ...defaultValues, tipus: defaultTipus },
   })
 
   useEffect(() => {
@@ -68,7 +80,8 @@ export default function CategoryModal({
       })
     } else {
       form.reset({
-        nom: "", tipus: defaultTipus, color: "#6366f1", icona: "tag", pressupost_mensual: null,
+        ...defaultValues,
+        tipus: defaultTipus,
       })
     }
   }, [category, defaultTipus, form, open])

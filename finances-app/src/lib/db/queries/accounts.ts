@@ -220,3 +220,54 @@ export async function deleteAccountTransferring(accountId: string, targetAccount
     throw e
   }
 }
+
+/** Recalculates all account balances and all people cached balances for a user */
+export async function recalculateAllBalances(userId: string): Promise<{ accountsUpdated: number; peopleUpdated: number }> {
+  const db = getDb()
+  const tx = await db.transaction("write")
+  try {
+    const ts = now()
+
+    // 1. Recalculate all account balances
+    const accounts = await tx.execute({
+      sql: `SELECT id FROM accounts WHERE user_id = ? AND eliminat = false`,
+      args: [userId],
+    })
+
+    for (const acc of accounts.rows) {
+      const accountId = (acc as unknown as { id: string }).id
+      const newBal = await recalculateAccountBalance(tx, accountId, userId)
+      await tx.execute({
+        sql: `UPDATE accounts SET saldo = ?, data_modificacio = ? WHERE id = ?`,
+        args: [newBal, ts, accountId],
+      })
+    }
+
+    // 2. Recalculate all people cached balances
+    const people = await tx.execute({
+      sql: `SELECT id FROM people WHERE user_id = ? AND eliminat = false`,
+      args: [userId],
+    })
+
+    for (const person of people.rows) {
+      const personId = (person as unknown as { id: string }).id
+      const balResult = await tx.execute({
+        sql: `SELECT COALESCE(SUM(import_degut), 0) as total
+              FROM transaction_splits
+              WHERE persona_id = ? AND eliminat = false`,
+        args: [personId],
+      })
+      const newBalance = Number((balResult.rows[0] as unknown as { total: number }).total)
+      await tx.execute({
+        sql: `UPDATE people SET saldo_caixejat = ?, data_modificacio = ? WHERE id = ?`,
+        args: [newBalance, ts, personId],
+      })
+    }
+
+    await tx.commit()
+    return { accountsUpdated: accounts.rows.length, peopleUpdated: people.rows.length }
+  } catch (e) {
+    await tx.rollback()
+    throw e
+  }
+}

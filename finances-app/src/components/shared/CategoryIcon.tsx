@@ -1,5 +1,4 @@
-import * as LucideIcons from "lucide-react"
-import { Tag } from "lucide-react"
+import { fallbackIcon, iconMap } from "@/lib/iconMap"
 
 interface CategoryIconProps {
   icona: string
@@ -14,8 +13,7 @@ const SIZE_MAP = {
 }
 
 export default function CategoryIcon({ icona, color, size = "md" }: CategoryIconProps) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const IconComponent = (LucideIcons as any)[icona] ?? Tag
+  const IconComponent = iconMap[icona] ?? fallbackIcon
   const { container, icon } = SIZE_MAP[size]
 
   return (

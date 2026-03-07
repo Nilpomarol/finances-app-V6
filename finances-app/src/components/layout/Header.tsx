@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom"
-import { useAuthStore } from "@/store/authstore"
+import { useAuthStore } from "@/store/authStore"
 
 const routeTitles: Record<string, string> = {
   "/": "Dashboard",

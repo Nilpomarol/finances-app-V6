@@ -118,6 +118,7 @@ export interface TransactionWithRelations extends Transaction {
   categoria_icona?: string
   esdeveniment_nom?: string
   event_tag_nom?: string
+  event_tag_color?: string
   persona_nom?: string // si és liquidació
 }
 

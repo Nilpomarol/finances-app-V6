@@ -1,21 +1,22 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, lazy, Suspense } from "react"
 import { Outlet } from "react-router-dom"
 import { Toaster } from "sonner"
 import AuthGuard from "@/components/features/auth/AuthGuard"
 import Sidebar from "@/components/layout/Sidebar"
 import MobileNav from "@/components/layout/MobileNav"
 import Header from "@/components/layout/Header"
-import TransactionModal from "@/components/features/transaccions/TransactionModal"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 
 // Importacions necessàries per carregar les dades de la BD
-import { useAuthStore } from "@/store/authstore"
+import { useAuthStore } from "@/store/authStore"
 import { getAccounts } from "@/lib/db/queries/accounts"
 import { getCategories } from "@/lib/db/queries/categories"
 import { getPeople } from "@/lib/db/queries/people"
-import type { Account, Category, Person } from "@/types/database"
+import type { Account, Category, Event, Person } from "@/types/database"
 import { getEvents } from "@/lib/db/queries/events"
+
+const TransactionModal = lazy(() => import("@/components/features/transaccions/TransactionModal"))
 
 export default function Layout() {
   const [showTransactionModal, setShowTransactionModal] = useState(false)
@@ -25,7 +26,7 @@ export default function Layout() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [people, setPeople] = useState<Person[]>([])
-  const [events, setEvents] = useState<any[]>([])
+  const [events, setEvents] = useState<Event[]>([])
   // 2. Anem a buscar els comptes i categories un cop l'usuari és vàlid
   // 2. Anem a buscar les dades cada cop que l'usuari és vàlid o S'OBRE EL MODAL
   useEffect(() => {
@@ -64,20 +65,22 @@ export default function Layout() {
         </Button>
 
         {/* El Modal Global ara rep les dades reals */}
-        <TransactionModal
-          isOpen={showTransactionModal}
-          onClose={() => setShowTransactionModal(false)}
-          accounts={accounts}
-          categories={categories}
-          people={people}
-          events={events}
-          onSuccess={() => {
-            setShowTransactionModal(false)
-            // Aquí, si estiguessis al Dashboard, potser voldries que es refresquessin
-            // les dades. Al ser el Layout, amb tancar-lo n'hi ha prou per ara.
-            // Si hi ha problemes de refresc a les pàgines, implementarem un event global més endavant!
-          }}
-        />
+        <Suspense fallback={null}>
+          <TransactionModal
+            isOpen={showTransactionModal}
+            onClose={() => setShowTransactionModal(false)}
+            accounts={accounts}
+            categories={categories}
+            people={people}
+            events={events}
+            onSuccess={() => {
+              setShowTransactionModal(false)
+              // Aquí, si estiguessis al Dashboard, potser voldries que es refresquessin
+              // les dades. Al ser el Layout, amb tancar-lo n'hi ha prou per ara.
+              // Si hi ha problemes de refresc a les pàgines, implementarem un event global més endavant!
+            }}
+          />
+        </Suspense>
       </div>
       <Toaster />
     </AuthGuard>

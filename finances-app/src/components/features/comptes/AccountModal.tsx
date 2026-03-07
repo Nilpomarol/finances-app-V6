@@ -1,10 +1,9 @@
 import { useEffect } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useAuthStore } from "@/store/authStore"
 import { createAccount, updateAccount } from "@/lib/db/queries/accounts"
-import { generateId } from "@/lib/utils"
 import type { Account } from "@/types/database"
 import {
   Dialog,
@@ -38,10 +37,24 @@ const accountSchema = z.object({
   tipus: z.enum(["banc", "estalvi", "efectiu", "inversio"]),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Color hexadecimal invàlid"),
   logo: z.string().max(50).optional().default(""),
-  saldo: z.coerce.number({ invalid_type_error: "Ha de ser un número" }),
+  saldo: z.coerce.number(),
 })
 
-type AccountFormValues = z.infer<typeof accountSchema>
+type AccountFormValues = {
+  nom: string
+  tipus: "banc" | "estalvi" | "efectiu" | "inversio"
+  color: string
+  logo: string
+  saldo: number
+}
+
+const defaultValues: AccountFormValues = {
+  nom: "",
+  tipus: "banc",
+  color: "#6366f1",
+  logo: "",
+  saldo: 0,
+}
 
 const TIPUS_OPTIONS = [
   { value: "banc", label: "Banc" },
@@ -73,14 +86,8 @@ export default function AccountModal({
   const isEditing = !!account
 
   const form = useForm<AccountFormValues>({
-    resolver: zodResolver(accountSchema),
-    defaultValues: {
-      nom: "",
-      tipus: "banc",
-      color: "#6366f1",
-      logo: "",
-      saldo: 0,
-    },
+    resolver: zodResolver(accountSchema) as Resolver<AccountFormValues>,
+    defaultValues,
   })
 
   // Pre-emplena el formulari en mode edició
@@ -94,13 +101,7 @@ export default function AccountModal({
         saldo: account.saldo,
       })
     } else {
-      form.reset({
-        nom: "",
-        tipus: "banc",
-        color: "#6366f1",
-        logo: "",
-        saldo: 0,
-      })
+      form.reset(defaultValues)
     }
   }, [account, form, open])
 
@@ -194,7 +195,11 @@ export default function AccountModal({
                         step="0.01"
                         placeholder="0.00"
                         className="pr-8"
-                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                         €

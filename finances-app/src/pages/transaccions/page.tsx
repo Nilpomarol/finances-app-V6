@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react"
-import { useAuthStore } from "@/store/authstore"
+import { useAuthStore } from "@/store/authStore"
 import { getTransactions, deleteTransaction } from "@/lib/db/queries/transactions"
 import { getAccounts } from "@/lib/db/queries/accounts"
 import { getCategories } from "@/lib/db/queries/categories"

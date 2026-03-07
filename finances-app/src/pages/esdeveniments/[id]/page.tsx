@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { useAuthStore } from "@/store/authstore"
+import { useAuthStore } from "@/store/authStore"
 import { getEventById, getTransactionsByEvent } from "@/lib/db/queries/events"
 import type { Event, TransactionWithRelations } from "@/types/database"
 import { formatEuros } from "@/lib/utils"

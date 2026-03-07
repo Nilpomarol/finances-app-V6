@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useAuthStore } from "@/store/authstore"
+import { useAuthStore } from "@/store/authStore"
 import FamilyPasswordScreen from "./FamilyPasswordScreen"
 import UserSelectionScreen from "./UserSelectionScreen"
 import { Loader2 } from "lucide-react"
