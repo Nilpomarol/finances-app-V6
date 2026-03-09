@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom"
 import { useAuthStore } from "@/store/authStore"
+import { useThemeStore } from "@/store/themeStore"
 import {
   LayoutDashboard,
   ArrowLeftRight,
@@ -10,7 +11,9 @@ import {
   BarChart2,
   Settings,
   LogOut,
-  Plus,        // ← afegit
+  Plus,
+  Sun,
+  Moon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -30,8 +33,9 @@ interface SidebarProps {
   onNewTransaction?: () => void
 }
 
-export default function Sidebar({ onNewTransaction }: SidebarProps) {  // ← fix
+export default function Sidebar({ onNewTransaction }: SidebarProps) {
   const { logout } = useAuthStore()
+  const { theme, toggleTheme } = useThemeStore()
 
   return (
     <aside className="hidden md:flex flex-col w-60 shrink-0 border-r bg-card h-screen sticky top-0">
@@ -86,6 +90,18 @@ export default function Sidebar({ onNewTransaction }: SidebarProps) {  // ← fi
           <Settings className="w-4 h-4 shrink-0" />
           Configuració
         </NavLink>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+          onClick={toggleTheme}
+        >
+          {theme === "dark"
+            ? <Sun className="w-4 h-4 shrink-0" />
+            : <Moon className="w-4 h-4 shrink-0" />}
+          {theme === "dark" ? "Mode clar" : "Mode fosc"}
+        </Button>
 
         <Button
           variant="ghost"

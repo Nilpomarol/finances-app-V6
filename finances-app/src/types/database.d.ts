@@ -114,12 +114,13 @@ export interface TransactionWithRelations extends Transaction {
   compte_color?: string
   compte_desti_nom?: string
   categoria_nom?: string
-  categoria_color?: string
+  categoria_color?: stringa
   categoria_icona?: string
   esdeveniment_nom?: string
   event_tag_nom?: string
   event_tag_color?: string
-  persona_nom?: string // si és liquidació
+  persona_nom?: string 
+  total_deutes?: number
 }
 
 // Resultat d'agrupació per categoria (per al dashboard)

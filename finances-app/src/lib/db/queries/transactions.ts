@@ -83,7 +83,8 @@ export async function getTransactions(
             c.icona as categoria_icona,
             e.nom as esdeveniment_nom,
             et.nom as event_tag_nom,
-            p.nom as persona_nom
+            p.nom as persona_nom,
+            (SELECT COALESCE(SUM(import_degut), 0) FROM transaction_splits WHERE transaccio_id = t.id AND eliminat = false) as total_deutes
           FROM transactions t
           LEFT JOIN accounts a ON t.compte_id = a.id
           LEFT JOIN accounts ad ON t.compte_desti_id = ad.id

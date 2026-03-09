@@ -6,11 +6,11 @@ import type { Category } from "@/types/database"
 import CategoryModal from "@/components/features/categories/CategoryModal"
 import DynamicIcon from "@/components/shared/DynamicIcon"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Plus, Pencil, Trash2, Tag } from "lucide-react"
+import { Plus, Tag, TrendingDown, TrendingUp, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { PageHeader } from "@/components/shared/PageHeader"
+import EntityTransactionsModal from "@/components/shared/EntityTransactionsModal"
+import type { EntityTransactionsEntity } from "@/components/shared/EntityTransactionsModal"
 
 export default function CategoriesPage() {
   const { userId } = useAuthStore()
@@ -20,6 +20,8 @@ export default function CategoriesPage() {
   const [activeTab, setActiveTab] = useState<"despesa" | "ingres">("despesa")
   const [showModal, setShowModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | undefined>()
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [txEntity, setTxEntity] = useState<EntityTransactionsEntity | null>(null)
 
   const loadData = useCallback(async () => {
     if (!userId) return
@@ -38,10 +40,22 @@ export default function CategoriesPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const handleEdit = (cat: Category) => { setEditingCategory(cat); setShowModal(true) }
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = () => setOpenMenuId(null)
+    if (openMenuId) document.addEventListener("click", handler)
+    return () => document.removeEventListener("click", handler)
+  }, [openMenuId])
+
+  const handleEdit = (cat: Category) => {
+    setEditingCategory(cat)
+    setShowModal(true)
+    setOpenMenuId(null)
+  }
 
   const handleDelete = async (cat: Category) => {
     if (!userId) return
+    setOpenMenuId(null)
     if (!confirm(`Eliminar la categoria "${cat.nom}"? Les transaccions associades quedaran sense categoria.`)) return
     await deleteCategory(cat.id, userId)
     loadData()
@@ -59,131 +73,235 @@ export default function CategoriesPage() {
   }
 
   const filtered = categories.filter((c) => c.tipus === activeTab)
+  const despesaCount = categories.filter((c) => c.tipus === "despesa").length
+  const ingresCount = categories.filter((c) => c.tipus === "ingres").length
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Categories</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{categories.length} categories configurades</p>
-        </div>
-        <Button onClick={() => { setEditingCategory(undefined); setShowModal(true) }}>
-          <Plus className="w-4 h-4 mr-2" />Nova categoria
-        </Button>
+    <div className="space-y-6 pb-8">
+      {/* Header */}
+      <PageHeader
+        title="Categories"
+        subtitle={`${categories.length} categories configurades`}
+        action={
+          <Button
+            onClick={() => { setEditingCategory(undefined); setShowModal(true) }}
+            className="h-9 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-sm shadow-sm"
+          >
+            <Plus className="w-4 h-4 mr-1.5" /> Nova categoria
+          </Button>
+        }
+      />
+
+      {/* Tab Switcher */}
+      <div className="flex items-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-1 w-fit">
+        <button
+          onClick={() => setActiveTab("despesa")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+            activeTab === "despesa"
+              ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          )}
+        >
+          <TrendingDown className="w-3.5 h-3.5" />
+          Despeses
+          <span className={cn(
+            "inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold",
+            activeTab === "despesa"
+              ? "bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300"
+              : "bg-slate-200 dark:bg-slate-700 text-slate-500"
+          )}>
+            {despesaCount}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab("ingres")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all",
+            activeTab === "ingres"
+              ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          )}
+        >
+          <TrendingUp className="w-3.5 h-3.5" />
+          Ingressos
+          <span className={cn(
+            "inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold",
+            activeTab === "ingres"
+              ? "bg-slate-100 dark:bg-slate-600 text-slate-600 dark:text-slate-300"
+              : "bg-slate-200 dark:bg-slate-700 text-slate-500"
+          )}>
+            {ingresCount}
+          </span>
+        </button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "despesa" | "ingres")}>
-        <TabsList className="grid w-full grid-cols-2 max-w-xs">
-          <TabsTrigger value="despesa">
-            Despeses
-            <Badge variant="secondary" className="ml-2 text-xs">
-              {categories.filter((c) => c.tipus === "despesa").length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="ingres">
-            Ingressos
-            <Badge variant="secondary" className="ml-2 text-xs">
-              {categories.filter((c) => c.tipus === "ingres").length}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
+      {/* Content */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[88px] rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mb-4">
+            <Tag className="w-6 h-6 text-slate-400" />
+          </div>
+          <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+            Cap categoria de {activeTab === "despesa" ? "despeses" : "ingressos"}
+          </p>
+          <p className="text-xs text-slate-400 mt-1 mb-5">
+            Crea categories per organitzar les teves transaccions
+          </p>
+          <Button
+            onClick={() => { setEditingCategory(undefined); setShowModal(true) }}
+            className="h-9 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-sm"
+          >
+            <Plus className="w-4 h-4 mr-1.5" /> Crear categoria
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {filtered.map((cat) => {
+            const monthTotal = getMonthTotal(cat.id)
+            const budgetStatus = getBudgetStatus(cat)
+            const pct = cat.pressupost_mensual
+              ? Math.min((monthTotal / cat.pressupost_mensual) * 100, 100) : 0
+            const isMenuOpen = openMenuId === cat.id
 
-        {(["despesa", "ingres"] as const).map((tipus) => (
-          <TabsContent key={tipus} value={tipus} className="mt-4">
-            {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse"><CardContent className="p-4 h-16" /></Card>)}
-              </div>
-            ) : filtered.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <Tag className="w-10 h-10 text-muted-foreground mb-3" />
-                  <h3 className="font-semibold">Cap categoria de {tipus === "despesa" ? "despeses" : "ingressos"}</h3>
-                  <p className="text-muted-foreground text-sm mt-1 mb-4">Crea categories per organitzar les teves transaccions</p>
-                  <Button onClick={() => { setEditingCategory(undefined); setShowModal(true) }}>
-                    <Plus className="w-4 h-4 mr-2" />Crear categoria
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {filtered.map((cat) => {
-                  const monthTotal = getMonthTotal(cat.id)
-                  const budgetStatus = getBudgetStatus(cat)
-                  const pct = cat.pressupost_mensual
-                    ? Math.min((monthTotal / cat.pressupost_mensual) * 100, 100) : 0
+            return (
+              <div
+                key={cat.id}
+                onClick={() => setTxEntity({ type: "category", id: cat.id, name: cat.nom, color: cat.color, iconName: cat.icona })}
+                className={cn(
+                  "group relative rounded-2xl border bg-white dark:bg-slate-900 p-4 cursor-pointer",
+                  "border-slate-200 dark:border-slate-700/50",
+                  "shadow-[0_1px_4px_rgba(15,23,42,0.05),0_6px_24px_rgba(15,23,42,0.04)]",
+                  "dark:shadow-[0_1px_4px_rgba(0,0,0,0.2),0_6px_24px_rgba(0,0,0,0.2)]",
+                  "transition-all hover:shadow-[0_2px_8px_rgba(15,23,42,0.08),0_8px_28px_rgba(15,23,42,0.07)]",
+                  "dark:hover:border-slate-600/70"
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Icon */}
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ backgroundColor: cat.color + "18" }}
+                  >
+                    <DynamicIcon name={cat.icona} className="w-5 h-5" style={{ color: cat.color }} />
+                  </div>
 
-                  return (
-                    <Card key={cat.id} className="group">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                            style={{ backgroundColor: cat.color + "20" }}>
-                            <DynamicIcon name={cat.icona} className="w-5 h-5" style={{ color: cat.color }} />
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-sm text-slate-900 dark:text-white truncate leading-tight">
+                        {cat.nom}
+                      </p>
+
+                      {/* Actions dropdown */}
+                      <div className="relative shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setOpenMenuId(isMenuOpen ? null : cat.id)
+                          }}
+                          className={cn(
+                            "w-7 h-7 rounded-lg flex items-center justify-center transition-all",
+                            isMenuOpen
+                              ? "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200"
+                              : "text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
+                          )}
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+
+                        {isMenuOpen && (
+                          <div
+                            className="absolute right-0 top-8 z-50 w-36 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleEdit(cat) }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                              Editar
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDelete(cat) }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Eliminar
+                            </button>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="font-medium truncate">{cat.nom}</p>
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEdit(cat)}>
-                                  <Pencil className="w-3 h-3" />
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 hover:text-destructive" onClick={() => handleDelete(cat)}>
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            </div>
-                            {cat.pressupost_mensual ? (
-                              <div className="mt-1.5 space-y-1">
-                                <div className="flex justify-between text-xs text-muted-foreground">
-                                  <span>{formatEuros(monthTotal)} gastats</span>
-                                  <span className={cn(
-                                    "font-medium",
-                                    budgetStatus === "red" && "text-destructive",
-                                    budgetStatus === "yellow" && "text-yellow-600",
-                                    budgetStatus === "green" && "text-green-600"
-                                  )}>{formatEuros(cat.pressupost_mensual)} limit</span>
-                                </div>
-                                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                  <div className={cn(
-                                    "h-full rounded-full transition-all",
-                                    budgetStatus === "red" && "bg-destructive",
-                                    budgetStatus === "yellow" && "bg-yellow-500",
-                                    budgetStatus === "green" && "bg-green-500"
-                                  )} style={{ width: `${pct}%` }} />
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {monthTotal > 0 ? formatEuros(monthTotal) + " aquest mes" : "Sense activitat aquest mes"}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-
-                {/* Categoria virtual */}
-                <Card className="border-dashed opacity-60">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <Tag className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-muted-foreground">Sense Categoria</p>
-                        <p className="text-xs text-muted-foreground">Categoria virtual - no es pot eliminar</p>
+                        )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+
+                    {/* Budget bar or activity */}
+                    {cat.pressupost_mensual ? (
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-400 tabular-nums">
+                            {formatEuros(monthTotal)} gastats
+                          </span>
+                          <span className={cn(
+                            "font-semibold tabular-nums",
+                            budgetStatus === "red" && "text-rose-500",
+                            budgetStatus === "yellow" && "text-amber-500",
+                            budgetStatus === "green" && "text-emerald-500"
+                          )}>
+                            {formatEuros(cat.pressupost_mensual)} límit
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              budgetStatus === "red" && "bg-rose-500",
+                              budgetStatus === "yellow" && "bg-amber-500",
+                              budgetStatus === "green" && "bg-emerald-500"
+                            )}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 mt-1 tabular-nums">
+                        {monthTotal > 0 ? (
+                          <>
+                            <span className="font-semibold" style={{ color: cat.color }}>
+                              {formatEuros(monthTotal)}
+                            </span>
+                            {" aquest mes"}
+                          </>
+                        ) : (
+                          "Sense activitat aquest mes"
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-          </TabsContent>
-        ))}
-      </Tabs>
+            )
+          })}
+
+          {/* Virtual "No category" card */}
+          <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900 p-4 opacity-50">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                <Tag className="w-5 h-5 text-slate-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm text-slate-500 dark:text-slate-400">Sense Categoria</p>
+                <p className="text-xs text-slate-400 mt-0.5">Categoria virtual · no eliminable</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <CategoryModal
         open={showModal}
@@ -191,6 +309,12 @@ export default function CategoriesPage() {
         onSuccess={loadData}
         category={editingCategory}
         defaultTipus={activeTab}
+      />
+
+      <EntityTransactionsModal
+        isOpen={!!txEntity}
+        onClose={() => setTxEntity(null)}
+        entity={txEntity}
       />
     </div>
   )

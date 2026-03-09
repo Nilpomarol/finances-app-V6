@@ -8,7 +8,7 @@ interface Props {
 
 export function RecurringAnalysis({ transactions }: Props) {
   const recurrents = transactions.filter(t => t.recurrent && t.tipus === 'despesa')
-  const totalRecurrent = recurrents.reduce((acc, t) => acc + t.import_trs, 0)
+  const totalRecurrent = recurrents.reduce((acc, t) => acc + t.import_trs - (t.total_deutes ?? 0), 0)
 
   return (
     <div className="space-y-6">
@@ -22,7 +22,7 @@ export function RecurringAnalysis({ transactions }: Props) {
         <CardContent>
           <div className="text-3xl font-bold text-primary">{formatEuros(totalRecurrent)}</div>
           <p className="text-xs text-muted-foreground mt-1">
-            Representa el {transactions.length > 0 ? ((totalRecurrent / transactions.reduce((acc, t) => acc + (t.tipus === 'despesa' ? t.import_trs : 0), 0)) * 100).toFixed(1) : 0}% de les teves despeses totals.
+            Representa el {transactions.length > 0 ? ((totalRecurrent / transactions.reduce((acc, t) => acc + (t.tipus === 'despesa' ? t.import_trs - (t.total_deutes ?? 0) : 0), 0)) * 100).toFixed(1) : 0}% de les teves despeses totals.
           </p>
         </CardContent>
       </Card>
@@ -42,7 +42,7 @@ export function RecurringAnalysis({ transactions }: Props) {
                     <p className="font-medium text-sm">{t.concepte}</p>
                     <p className="text-xs text-muted-foreground">{t.categoria_nom || 'Sense categoria'}</p>
                   </div>
-                  <span className="font-bold text-sm">{formatEuros(t.import_trs)}</span>
+                  <span className="font-bold text-sm">{formatEuros(t.import_trs - (t.total_deutes ?? 0))}</span>
                 </div>
               ))}
             </div>

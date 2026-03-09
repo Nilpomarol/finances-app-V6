@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Calendar, Trash2 } from "lucide-react"
+import { PageHeader } from "@/components/shared/PageHeader"
+import { EmptyState } from "@/components/shared/EmptyState"
+import { ColorDot } from "@/components/shared/ColorDot"
 import { formatEuros } from "@/lib/utils"
 import EventModal from "@/components/features/esdeveniments/EventModal"
 import { useToast } from "@/hooks/use-toast"
@@ -65,9 +68,7 @@ export default function EsdevenimentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Esdeveniments i Viatges</h1>
-      </div>
+      <PageHeader title="Esdeveniments i Viatges" />
 
       <Tabs defaultValue="events" className="w-full">
         <TabsList className="mb-4">
@@ -88,10 +89,10 @@ export default function EsdevenimentsPage() {
               {[1, 2, 3].map(i => <Card key={i} className="h-32 animate-pulse bg-muted/50" />)}
             </div>
           ) : events.length === 0 ? (
-            <Card className="text-center py-20 border-2 border-dashed">
-              <Calendar className="mx-auto w-12 h-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Encara no has creat cap esdeveniment.</p>
-            </Card>
+            <EmptyState
+              icon={<Calendar className="w-12 h-12" />}
+              title="Encara no has creat cap esdeveniment"
+            />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {events.map(event => (
@@ -153,7 +154,7 @@ export default function EsdevenimentsPage() {
                 {tagsDelTipus.map(tag => (
                   <div key={tag.id} className="flex items-center justify-between p-3 border rounded-md shadow-sm bg-background">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                      <ColorDot color={tag.color} />
                       <span className="text-sm font-medium">{tag.nom}</span>
                     </div>
                     <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleDeleteTag(tag.id)}>

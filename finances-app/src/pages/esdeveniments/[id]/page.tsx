@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft, CalendarDays, Wallet, TrendingUp } from "lucide-react"
+import { KpiCard } from "@/components/shared/KpiCard"
+import { ColorDot } from "@/components/shared/ColorDot"
 
 export default function EsdevenimentDetallPage() {
   const { id } = useParams()
@@ -121,33 +123,21 @@ export default function EsdevenimentDetallPage() {
 
       {/* Targetes KPI */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Total Gastat</CardTitle>
-            <Wallet className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{formatEuros(kpis.totalGastat)}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Dies de Duració</CardTitle>
-            <CalendarDays className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{kpis.dies} dies</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Mitjana per Dia</CardTitle>
-            <TrendingUp className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatEuros(kpis.mitjanaDia)} <span className="text-sm font-normal text-muted-foreground">/ dia</span></div>
-          </CardContent>
-        </Card>
+        <KpiCard
+          title="Total Gastat"
+          icon={<Wallet className="w-4 h-4 text-muted-foreground" />}
+          value={<span className="text-destructive">{formatEuros(kpis.totalGastat)}</span>}
+        />
+        <KpiCard
+          title="Dies de Duració"
+          icon={<CalendarDays className="w-4 h-4 text-muted-foreground" />}
+          value={`${kpis.dies} dies`}
+        />
+        <KpiCard
+          title="Mitjana per Dia"
+          icon={<TrendingUp className="w-4 h-4 text-muted-foreground" />}
+          value={<>{formatEuros(kpis.mitjanaDia)} <span className="text-sm font-normal text-muted-foreground">/ dia</span></>}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -167,7 +157,7 @@ export default function EsdevenimentDetallPage() {
                 {breakdown.categories.map((item, i) => (
                   <div key={i} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <ColorDot color={item.color} />
                       <span className="font-medium text-sm">{item.nom}</span>
                     </div>
                     <span className="text-sm font-bold">{formatEuros(item.total)}</span>
@@ -179,7 +169,7 @@ export default function EsdevenimentDetallPage() {
                 {breakdown.tags.map((item, i) => (
                   <div key={i} className={`flex items-center justify-between ${item.isFallback ? 'opacity-60' : ''}`}>
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <ColorDot color={item.color} />
                       <span className="font-medium text-sm">{item.nom}</span>
                     </div>
                     <span className="text-sm font-bold">{formatEuros(item.total)}</span>

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { ColorDot } from "@/components/shared/ColorDot"
 import {
   Trash2, Plus, Sparkles, Download, Loader2, ArrowRight,
   RefreshCw, Repeat, Info, CheckCircle2, Shield
@@ -267,7 +268,7 @@ export default function ConfiguracioPage() {
                 {Object.values(recurrentsByCategory).sort((a, b) => b.total - a.total).map(cat => (
                   <div key={cat.nom} className="p-3 border rounded-lg bg-card">
                     <div className="flex items-center gap-2 mb-1">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
+                      <ColorDot color={cat.color} className="w-2.5 h-2.5" />
                       <span className="text-xs font-medium truncate">{cat.nom}</span>
                     </div>
                     <div className="text-sm font-bold">{formatEuros(cat.total)}</div>
@@ -342,7 +343,7 @@ export default function ConfiguracioPage() {
                     {assignableCategories.map(cat => (
                       <SelectItem key={cat.id} value={cat.id}>
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
+                          <ColorDot color={cat.color} className="w-2 h-2" />
                           {cat.nom}
                         </div>
                       </SelectItem>
@@ -383,7 +384,7 @@ export default function ConfiguracioPage() {
                         </div>
                         <ArrowRight className="w-4 h-4 text-muted-foreground hidden sm:block" />
                         <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: category?.color || '#ccc' }} />
+                          <ColorDot color={category?.color || '#ccc'} />
                           <span className="font-medium text-sm">{category?.nom || 'Categoria eliminada'}</span>
                         </div>
                       </div>

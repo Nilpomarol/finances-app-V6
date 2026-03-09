@@ -1,10 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from "react"
-import { Outlet } from "react-router-dom"
+import { Outlet, useLocation } from "react-router-dom"
 import { Toaster } from "sonner"
 import AuthGuard from "@/components/features/auth/AuthGuard"
 import Sidebar from "@/components/layout/Sidebar"
 import MobileNav from "@/components/layout/MobileNav"
-import Header from "@/components/layout/Header"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 
@@ -20,6 +19,8 @@ const TransactionModal = lazy(() => import("@/components/features/transaccions/T
 
 export default function Layout() {
   const [showTransactionModal, setShowTransactionModal] = useState(false)
+  const location = useLocation()
+  const isDashboard = location.pathname === "/"
   
   // 1. Obtenim l'usuari actiu i preparem l'estat per a les dades
   const { userId } = useAuthStore()
@@ -47,8 +48,7 @@ export default function Layout() {
         <Sidebar onNewTransaction={() => setShowTransactionModal(true)} />
 
         <div className="flex-1 flex flex-col min-w-0">
-          <Header />
-          <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
+          <main className={`flex-1 pb-20 md:pb-6 md:p-6 ${isDashboard ? "px-0 pt-0 pb-4" : "p-4"}`}>
             <Outlet />
           </main>
         </div>

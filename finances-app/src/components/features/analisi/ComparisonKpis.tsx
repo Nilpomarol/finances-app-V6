@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp, TrendingDown } from "lucide-react"
 import { formatEuros } from "@/lib/utils"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
+import { ColorDot } from "@/components/shared/ColorDot"
 
 interface ComparisonData {
   actual: number
@@ -191,10 +192,7 @@ export function ComparisonKPIs({ ingressos, despeses, categoryComparison, dailyD
                     <tr key={cat.nom} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                       <td className="py-2.5">
                         <div className="flex items-center gap-2">
-                          <span
-                            className="w-3 h-3 rounded-full inline-block flex-shrink-0"
-                            style={{ backgroundColor: cat.color }}
-                          />
+                          <ColorDot color={cat.color} />
                           <span className="font-medium">{cat.nom}</span>
                         </div>
                       </td>

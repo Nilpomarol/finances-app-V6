@@ -67,7 +67,7 @@ export default function AnalisiPage() {
 
     filteredAnterior.forEach(t => {
       if (t.tipus === 'ingres') ingressos += t.import_trs
-      else if (t.tipus === 'despesa') despeses += t.import_trs
+      else if (t.tipus === 'despesa') despeses += t.import_trs - (t.total_deutes ?? 0)
     })
     return { ingressos, despeses }
   }, [transactionsAnterior, compteIds, categoriaIds])
@@ -157,14 +157,15 @@ function processTransactions(transactions: TransactionWithRelations[], periode: 
       ingressos += t.import_trs
       if (dailyMap[dia]) dailyMap[dia].ingresos += t.import_trs
     } else if (t.tipus === 'despesa') {
-      despeses += t.import_trs
-      if (dailyMap[dia]) dailyMap[dia].gastos += t.import_trs
+      const netAmount = t.import_trs - (t.total_deutes ?? 0)
+      despeses += netAmount
+      if (dailyMap[dia]) dailyMap[dia].gastos += netAmount
 
       const catName = t.categoria_nom || "Sense categoria"
       if (!categoryMap[catName]) {
         categoryMap[catName] = { name: catName, value: 0, color: t.categoria_color || "#ccc" }
       }
-      categoryMap[catName].value += t.import_trs
+      categoryMap[catName].value += netAmount
     }
   })
 
@@ -204,7 +205,7 @@ function processCategoryComparison(
     if (!categoryMap[catName]) {
       categoryMap[catName] = { nom: catName, color: t.categoria_color || "#ccc", actual: 0, anterior: 0 }
     }
-    categoryMap[catName].actual += t.import_trs
+    categoryMap[catName].actual += t.import_trs - (t.total_deutes ?? 0)
   })
 
   // Processar despeses del període anterior
@@ -214,7 +215,7 @@ function processCategoryComparison(
     if (!categoryMap[catName]) {
       categoryMap[catName] = { nom: catName, color: t.categoria_color || "#ccc", actual: 0, anterior: 0 }
     }
-    categoryMap[catName].anterior += t.import_trs
+    categoryMap[catName].anterior += t.import_trs - (t.total_deutes ?? 0)
   })
 
   return Object.values(categoryMap)

@@ -5,17 +5,21 @@ import { z } from "zod"
 import { useAuthStore } from "@/store/authStore"
 import { createPerson, updatePerson } from "@/lib/db/queries/people"
 import type { Person } from "@/types/database"
-
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog"
 import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
 } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
-import { toast } from "sonner" // o useToast segons el que utilitzis
+import { Loader2, X, UserRound } from "lucide-react"
+import { toast } from "sonner"
 
 const personSchema = z.object({
   nom: z.string().min(2, "El nom ha de tenir almenys 2 caràcters").max(50),
@@ -65,32 +69,77 @@ export default function PersonModal({ open, onClose, onSuccess, person }: Person
     }
   }
 
+  const nomValue = form.watch("nom")
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar Contacte" : "Nou Contacte"}</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="w-[calc(100%-2rem)] max-w-sm p-0 gap-0 overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/50 [&>button]:hidden rounded-2xl">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+              {nomValue.length >= 1 ? (
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                  {nomValue.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)}
+                </span>
+              ) : (
+                <UserRound className="w-5 h-5 text-slate-400" />
+              )}
+            </div>
+            <DialogTitle className="text-base font-bold text-slate-900 dark:text-white">
+              {isEditing ? "Editar contacte" : "Nou contacte"}
+            </DialogTitle>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
+          >
+            <X className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+          </button>
+        </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="nom" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nom</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ex: Maria, Joan, Pis..." {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+          <form onSubmit={form.handleSubmit(onSubmit)}>
 
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={onClose}>Cancel·lar</Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {isEditing ? "Guardar" : "Afegir"}
+            {/* Nom field */}
+            <div className="mx-5 mb-5 bg-slate-50 dark:bg-slate-800/50 rounded-xl overflow-hidden">
+              <FormField
+                control={form.control}
+                name="nom"
+                render={({ field }) => (
+                  <FormItem className="px-4 pt-3 pb-3 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                      Nom
+                    </p>
+                    <FormControl>
+                      <input
+                        placeholder="Ex: Maria, Joan, Pis..."
+                        className="w-full bg-transparent text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none border-none"
+                        autoFocus
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Submit */}
+            <div className="px-5 pb-5">
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="w-full h-12 text-base font-semibold rounded-xl bg-rose-500 hover:bg-rose-600 text-white"
+              >
+                {form.formState.isSubmitting && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                {isEditing ? "Guardar canvis" : "Afegir contacte"}
               </Button>
-            </DialogFooter>
+            </div>
+
           </form>
         </Form>
       </DialogContent>

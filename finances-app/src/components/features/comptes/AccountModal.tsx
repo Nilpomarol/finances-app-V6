@@ -8,29 +8,19 @@ import type { Account } from "@/types/database"
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+import { Loader2, Banknote, PiggyBank, Wallet, BarChart3, X } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 const accountSchema = z.object({
   nom: z.string().min(1, "El nom és obligatori").max(50),
@@ -57,23 +47,30 @@ const defaultValues: AccountFormValues = {
 }
 
 const TIPUS_OPTIONS = [
-  { value: "banc", label: "Banc" },
-  { value: "estalvi", label: "Estalvis" },
-  { value: "efectiu", label: "Efectiu" },
-  { value: "inversio", label: "Inversió" },
-]
+  { value: "banc",     label: "Banc",     icon: <Banknote className="w-4 h-4" /> },
+  { value: "estalvi",  label: "Estalvis", icon: <PiggyBank className="w-4 h-4" /> },
+  { value: "efectiu",  label: "Efectiu",  icon: <Wallet className="w-4 h-4" /> },
+  { value: "inversio", label: "Inversió", icon: <BarChart3 className="w-4 h-4" /> },
+] as const
 
 const COLOR_PRESETS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#ef4444",
-  "#f97316", "#eab308", "#22c55e", "#14b8a6",
-  "#3b82f6", "#64748b",
+  "#ef4444", "#f97316", "#eab308", "#22c55e",
+  "#14b8a6", "#3b82f6", "#6366f1", "#8b5cf6",
+  "#ec4899", "#64748b",
 ]
+
+const TIPUS_ACTIVE_STYLE: Record<string, { bg: string; text: string }> = {
+  banc:     { bg: "bg-blue-500",   text: "text-white" },
+  estalvi:  { bg: "bg-green-500",  text: "text-white" },
+  efectiu:  { bg: "bg-amber-500",  text: "text-white" },
+  inversio: { bg: "bg-purple-500", text: "text-white" },
+}
 
 interface AccountModalProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
-  account?: Account // si és undefined, és creació
+  account?: Account
 }
 
 export default function AccountModal({
@@ -90,7 +87,6 @@ export default function AccountModal({
     defaultValues,
   })
 
-  // Pre-emplena el formulari en mode edició
   useEffect(() => {
     if (account) {
       form.reset({
@@ -129,137 +125,172 @@ export default function AccountModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
+      <DialogContent className="w-[calc(100%-2rem)] max-w-md p-0 gap-0 overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/50 [&>button]:hidden rounded-2xl">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4">
+          <DialogTitle className="text-lg font-bold text-slate-900 dark:text-white">
             {isEditing ? "Editar compte" : "Nou compte"}
           </DialogTitle>
-        </DialogHeader>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
+          >
+            <X className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+          </button>
+        </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Nom */}
-            <FormField
-              control={form.control}
-              name="nom"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nom</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: La Caixa, Efectiu..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)}>
 
-            {/* Tipus */}
+            {/* Tipus switcher */}
             <FormField
               control={form.control}
               name="tipus"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipus</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {TIPUS_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
+                <div className="px-5 pb-4">
+                  <div className="flex gap-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl p-1">
+                    {TIPUS_OPTIONS.map((opt) => {
+                      const active = field.value === opt.value
+                      const style = TIPUS_ACTIVE_STYLE[opt.value]
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => field.onChange(opt.value)}
+                          className={cn(
+                            "flex-1 flex items-center justify-center gap-1.5 py-2 px-1.5 rounded-lg text-xs font-semibold transition-all",
+                            active
+                              ? `${style.bg} ${style.text} shadow-sm`
+                              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                          )}
+                        >
+                          {opt.icon}
+                          <span>{opt.label}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               )}
             />
 
-            {/* Saldo inicial */}
-            <FormField
-              control={form.control}
-              name="saldo"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    {isEditing ? "Saldo actual" : "Saldo inicial"}
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        className="pr-8"
-                        value={field.value ?? ""}
-                        onChange={(e) => field.onChange(e.target.value === "" ? 0 : Number(e.target.value))}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
+            {/* Form fields */}
+            <div className="mx-5 mb-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl overflow-hidden divide-y divide-slate-200 dark:divide-slate-700/50">
+
+              {/* Nom */}
+              <FormField
+                control={form.control}
+                name="nom"
+                render={({ field }) => (
+                  <FormItem className="px-4 pt-3 pb-3 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                      Nom
+                    </p>
+                    <FormControl>
+                      <input
+                        placeholder="Ex: La Caixa, Efectiu..."
+                        className="w-full bg-transparent text-base sm:text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none border-none"
+                        {...field}
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                        €
-                      </span>
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+
+              {/* Saldo */}
+              <FormField
+                control={form.control}
+                name="saldo"
+                render={({ field }) => (
+                  <FormItem className="px-4 pt-3 pb-3 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                      {isEditing ? "Saldo actual" : "Saldo inicial"}
+                    </p>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <span className="text-base sm:text-sm text-slate-400 dark:text-slate-500 font-medium">€</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          placeholder="0"
+                          className="w-full bg-transparent text-base sm:text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none border-none"
+                          value={field.value ?? ""}
+                          onChange={(e) =>
+                            field.onChange(e.target.value === "" ? 0 : Number(e.target.value))
+                          }
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             {/* Color */}
             <FormField
               control={form.control}
               name="color"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Color</FormLabel>
-                  <FormControl>
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {COLOR_PRESETS.map((color) => (
-                          <button
-                            key={color}
-                            type="button"
-                            onClick={() => field.onChange(color)}
-                            className="w-7 h-7 rounded-full border-2 transition-all"
-                            style={{
-                              backgroundColor: color,
-                              borderColor:
-                                field.value === color ? "#000" : "transparent",
-                              transform:
-                                field.value === color ? "scale(1.2)" : "scale(1)",
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <Input
-                        type="color"
-                        className="h-9 w-full cursor-pointer"
-                        {...field}
+                <div className="mx-5 mb-5 bg-slate-50 dark:bg-slate-800/50 rounded-xl px-4 pt-3 pb-4 space-y-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                    Color
+                  </p>
+                  <div className="flex flex-wrap gap-3 items-center">
+                    {COLOR_PRESETS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => field.onChange(color)}
+                        className="w-8 h-8 rounded-full transition-all focus:outline-none shrink-0"
+                        style={{
+                          backgroundColor: color,
+                          boxShadow: field.value === color ? `0 0 0 2px white, 0 0 0 4px ${color}` : "none",
+                          transform: field.value === color ? "scale(1.15)" : "scale(1)",
+                        }}
                       />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+                    ))}
+                    <label
+                      className="w-8 h-8 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center cursor-pointer hover:border-slate-400 transition-colors shrink-0 overflow-hidden relative"
+                      title="Color personalitzat"
+                    >
+                      <input
+                        type="color"
+                        className="absolute opacity-0 w-full h-full cursor-pointer"
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                      <span className="text-slate-400 dark:text-slate-500 text-xs font-bold pointer-events-none">+</span>
+                    </label>
+                    <div
+                      className="ml-auto w-8 h-8 rounded-full border-2 border-white dark:border-slate-700 shadow-sm shrink-0"
+                      style={{ backgroundColor: field.value }}
+                    />
+                  </div>
+                </div>
               )}
             />
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel·lar
-              </Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+            {/* Submit */}
+            <div className="px-5 pb-5">
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="w-full h-12 text-base font-semibold rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-white"
+              >
                 {form.formState.isSubmitting && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
-                {isEditing ? "Guardar" : "Crear"}
+                {isEditing ? "Guardar canvis" : "Crear compte"}
               </Button>
-            </DialogFooter>
+            </div>
+
           </form>
         </Form>
       </DialogContent>

@@ -1,47 +1,92 @@
 import { useEffect, useState, useMemo } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { useAuthStore } from "@/store/authStore"
-import { useFilterStore } from "@/store/filterStore"
+import { useThemeStore } from "@/store/themeStore"
 import { getAccounts } from "@/lib/db/queries/accounts"
 import { getTransactions } from "@/lib/db/queries/transactions"
 import { getCategories } from "@/lib/db/queries/categories"
 import { getEvents } from "@/lib/db/queries/events"
+import { getEventTags } from "@/lib/db/queries/event-tags"
 import { getRules } from "@/lib/db/queries/rules"
-import type { Account, TransactionWithRelations, Category } from "@/types/database"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatEuros, formatDate } from "@/lib/utils"
-import { ArrowDownRight, ArrowUpRight, Landmark, Wallet, Upload } from "lucide-react"
+import { getPeople } from "@/lib/db/queries/people"
+import type { Account, TransactionWithRelations, Category, Person } from "@/types/database"
+import { formatEuros } from "@/lib/utils"
+import {
+  ArrowDownRight, ArrowUpRight, Landmark, Wallet,
+  Upload, Activity, Plus,
+} from "lucide-react"
+import { KpiCard } from "@/components/shared/KpiCard"
 import { Button } from "@/components/ui/button"
 import ImportCsvModal from "@/components/features/importador-csv/ImportCsvModal"
+import TransactionModal from "@/components/features/transaccions/TransactionModal"
+import EntityTransactionsModal from "@/components/shared/EntityTransactionsModal"
+import type { EntityTransactionsEntity } from "@/components/shared/EntityTransactionsModal"
+import { CategoriesCard } from "@/components/features/dashboard/CategoriesCard"
+import { MovimentsCard } from "@/components/features/dashboard/MovimentsCard"
+import { DashboardMobile } from "@/components/features/dashboard/DashboardMobile"
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
 } from "recharts"
+import { cn } from "@/lib/utils"
+
+// ─── Viewport hook ────────────────────────────────────────────────────────────
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint)
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener("change", handler)
+    return () => mq.removeEventListener("change", handler)
+  }, [breakpoint])
+  return isMobile
+}
+
+// ─── Custom chart tooltip ────────────────────────────────────────────────────
+const ChartTooltip = ({ active, payload, label, nomMes }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900 shadow-lg px-4 py-3 text-sm">
+      <p className="text-slate-400 dark:text-slate-500 text-[11px] font-semibold mb-2">Dia {label} · {nomMes}</p>
+      {payload.map((entry: any) => (
+        <div key={entry.dataKey} className="flex items-center gap-2 text-xs">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+          <span className="text-slate-500 dark:text-slate-400">{entry.dataKey === "ingressos" ? "Ingressos" : "Despeses"}:</span>
+          <span className="font-bold text-slate-800 dark:text-slate-100 tabular-nums">{formatEuros(entry.value)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Account type display labels ─────────────────────────────────────────────
+const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  banc: "Compte Bancari",
+  estalvi: "Estalvis",
+  efectiu: "Efectiu",
+  inversio: "Inversió",
+}
 
 export default function DashboardPage() {
   const { userId } = useAuthStore()
   const navigate = useNavigate()
-  const { setCompteIds } = useFilterStore()
+  const { theme } = useThemeStore()
+  const isMobile = useIsMobile()
 
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [txEntity, setTxEntity] = useState<EntityTransactionsEntity | null>(null)
   const [transactions, setTransactions] = useState<TransactionWithRelations[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [people, setPeople] = useState<Person[]>([])
   const [events, setEvents] = useState<any[]>([])
+  const [eventTags, setEventTags] = useState<any[]>([])
   const [rules, setRules] = useState<any[]>([])
-
   const [isLoading, setIsLoading] = useState(true)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [categoryView, setCategoryView] = useState<"despesa" | "ingres">("despesa")
+  const [showTransactionModal, setShowTransactionModal] = useState(false)
 
   useEffect(() => {
     if (!userId) return
-
     const now = new Date()
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime()
@@ -49,418 +94,398 @@ export default function DashboardPage() {
     Promise.all([
       getAccounts(userId),
       getCategories(userId),
-      getTransactions({
-        userId,
-        dateStart: firstDay,
-        dateEnd: lastDay,
-        excludeLiquidacions: true
-      }),
+      getTransactions({ userId, dateStart: firstDay, dateEnd: lastDay, excludeLiquidacions: true }),
       getEvents(userId),
-      getRules(userId)
-    ]).then(([accs, cats, txs, eventsData, rulesData]) => {
+      getEventTags(userId),
+      getRules(userId),
+      getPeople(userId),
+    ]).then(([accs, cats, txs, eventsData, eventTagsData, rulesData, ppl]) => {
       setAccounts(accs)
       setCategories(cats)
       setTransactions(txs)
       setEvents(eventsData)
+      setEventTags(eventTagsData)
       setRules(rulesData)
+      setPeople(ppl)
       setIsLoading(false)
     })
   }, [userId])
 
-  // Calcul de KPIs globals
+  const nomMesActual = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat("ca-ES", { month: "long", year: "numeric" })
+    const t = fmt.format(new Date())
+    return t.charAt(0).toUpperCase() + t.slice(1).replace(" de ", " ")
+  }, [])
+
   const kpis = useMemo(() => {
     const patrimoni = accounts.reduce((acc, curr) => acc + curr.saldo, 0)
-    let ingressos = 0
-    let despeses = 0
-
+    let ingressos = 0, despeses = 0
     transactions.forEach(tx => {
-      if (tx.tipus === 'ingres') ingressos += tx.import_trs
-      if (tx.tipus === 'despesa') despeses += tx.import_trs
+      if (tx.tipus === "ingres") ingressos += tx.import_trs
+      if (tx.tipus === "despesa") despeses += tx.import_trs - (tx.total_deutes ?? 0)
     })
-
     return { patrimoni, ingressos, despeses, fluxNet: ingressos - despeses }
   }, [accounts, transactions])
 
-  // Daily evolution data for the line chart
   const dailyEvolution = useMemo(() => {
     const now = new Date()
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-
-    // Initialize all days
     const dailyMap: Record<number, { day: number; ingressos: number; despeses: number }> = {}
-    for (let d = 1; d <= daysInMonth; d++) {
-      dailyMap[d] = { day: d, ingressos: 0, despeses: 0 }
-    }
-
+    for (let d = 1; d <= daysInMonth; d++) dailyMap[d] = { day: d, ingressos: 0, despeses: 0 }
     transactions.forEach(tx => {
-      const txDate = new Date(tx.data)
-      const day = txDate.getDate()
+      const day = new Date(tx.data).getDate()
       if (dailyMap[day]) {
-        if (tx.tipus === 'ingres') {
-          dailyMap[day].ingressos += tx.import_trs
-        } else if (tx.tipus === 'despesa') {
-          dailyMap[day].despeses += tx.import_trs
-        }
+        if (tx.tipus === "ingres") dailyMap[day].ingressos += tx.import_trs
+        if (tx.tipus === "despesa") dailyMap[day].despeses += tx.import_trs - (tx.total_deutes ?? 0)
       }
     })
-
     return Object.values(dailyMap).sort((a, b) => a.day - b.day)
   }, [transactions])
 
-  // Category breakdown
-  const categoryBreakdown = useMemo(() => {
-    const catMap = new Map<string, {
-      id: string
-      nom: string
-      color: string
-      total: number
-      pressupost_mensual: number | null
-    }>()
-
+  const getCategoryBreakdown = (tipus: "despesa" | "ingres") => {
+    const catMap = new Map<string, any>()
     transactions.forEach(tx => {
-      if (tx.tipus !== categoryView) return
-      const catId = tx.categoria_id || '__sense_categoria__'
+      if (tx.tipus !== tipus) return
+      const catId = tx.categoria_id || "__sense__"
+      const amount = tipus === "despesa" ? tx.import_trs - (tx.total_deutes ?? 0) : tx.import_trs
       const existing = catMap.get(catId)
       if (existing) {
-        existing.total += tx.import_trs
+        existing.total += amount
       } else {
-        // Find the category to get color and budget
         const cat = categories.find(c => c.id === catId)
         catMap.set(catId, {
           id: catId,
-          nom: cat?.nom || 'Sense categoria',
-          color: cat?.color || '#999',
-          total: tx.import_trs,
-          pressupost_mensual: cat?.pressupost_mensual ?? null
+          nom: cat?.nom || "Sense categoria",
+          color: cat?.color || "#94a3b8",
+          total: amount,
+          pressupost_mensual: cat?.pressupost_mensual ?? null,
         })
       }
     })
-
     return Array.from(catMap.values()).sort((a, b) => b.total - a.total)
-  }, [transactions, categories, categoryView])
-
-  // AILLAMENT ANALITIC (Fase 3)
-  const ultimsMoviments = useMemo(() => {
-    const normals: any[] = []
-    const eventsMap = new Map<string, any>()
-
-    transactions.forEach(tx => {
-      if (tx.esdeveniment_id) {
-        const existing = eventsMap.get(tx.esdeveniment_id) || {
-          id: `evt-${tx.esdeveniment_id}`,
-          isEvent: true,
-          realEventId: tx.esdeveniment_id,
-          concepte: `✨ ${tx.esdeveniment_nom}`,
-          compte_nom: 'Diversos comptes',
-          categoria_nom: 'Aillat',
-          data: tx.data,
-          import_trs: 0,
-          tipus: 'despesa'
-        }
-
-        if (tx.tipus === 'despesa') existing.import_trs += tx.import_trs
-        if (tx.tipus === 'ingres') existing.import_trs -= tx.import_trs
-        if (tx.data > existing.data) existing.data = tx.data
-
-        eventsMap.set(tx.esdeveniment_id, existing)
-      } else {
-        normals.push({ ...tx, isEvent: false })
-      }
-    })
-
-    const combinat = [...normals, ...Array.from(eventsMap.values())]
-    return combinat.sort((a, b) => b.data - a.data).slice(0, 6)
-  }, [transactions])
-
-  const handleAccountClick = (accountId: string) => {
-    setCompteIds([accountId])
-    navigate('/analisi')
   }
 
-  const handleTransactionClick = (tx: any) => {
-    if (tx.isEvent) {
-      navigate(`/esdeveniments/${tx.realEventId}`)
-    } else {
-      navigate('/transaccions')
-    }
+  const expensesBreakdown = useMemo(() => getCategoryBreakdown("despesa"), [transactions, categories])
+  const incomesBreakdown = useMemo(() => getCategoryBreakdown("ingres"), [transactions, categories])
+  const ultimsMoviments = useMemo(() => transactions.slice(0, 8), [transactions])
+
+  const handleAccountClick = (acc: Account) => {
+    setTxEntity({ type: "account", id: acc.id, name: acc.nom, color: acc.color })
+  }
+
+  const handleTransactionClick = (tx: TransactionWithRelations) => {
+    if (tx.esdeveniment_id) navigate(`/esdeveniments/${tx.esdeveniment_id}`)
+    else navigate("/transaccions")
   }
 
   if (isLoading) {
-    return <div className="p-8 text-center text-muted-foreground animate-pulse">Carregant el teu resum financer...</div>
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-7 h-7 border-2 border-slate-200 dark:border-slate-700 border-t-slate-500 dark:border-t-slate-400 rounded-full animate-spin" />
+          <p className="text-slate-400 text-sm">Carregant resum financer…</p>
+        </div>
+      </div>
+    )
   }
 
+  const savingsRate = kpis.ingressos > 0
+    ? Math.round((kpis.fluxNet / kpis.ingressos) * 100)
+    : 0
+
+  // ── Mobile layout ──────────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <>
+        <DashboardMobile
+          accounts={accounts}
+          transactions={transactions}
+          kpis={kpis}
+          nomMesActual={nomMesActual}
+        />
+        <ImportCsvModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => { setShowImportModal(false); window.location.reload() }}
+          accounts={accounts}
+          categories={categories}
+          events={events}
+          eventTags={eventTags}
+          people={people}
+          rules={rules}
+        />
+      </>
+    )
+  }
+
+  // ── Desktop layout ─────────────────────────────────────────────────────────
+  const card = "rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900 shadow-[0_1px_4px_rgba(15,23,42,0.05),0_6px_24px_rgba(15,23,42,0.06)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3),0_6px_24px_rgba(0,0,0,0.3)] overflow-hidden"
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Resum del Mes</h1>
-        <Button variant="outline" onClick={() => setShowImportModal(true)}>
-          <Upload className="w-4 h-4 mr-2" /> Importar CSV
-        </Button>
+    <div className="space-y-10 w-full">
+
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+            {nomMesActual}
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
+            Resum Financer
+          </h1>
+          <p className="text-sm text-slate-400 mt-2">
+            {transactions.length} moviments registrats aquest mes
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            onClick={() => setShowTransactionModal(true)}
+            className="h-10 px-5 text-sm font-semibold rounded-xl"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nova transacció
+          </Button>
+          <Button
+            onClick={() => setShowImportModal(true)}
+            variant="outline"
+            className="h-10 px-5 text-sm font-semibold rounded-xl"
+          >
+            <Upload className="w-4 h-4 mr-2 opacity-70" />
+            Importar CSV
+          </Button>
+        </div>
       </div>
 
-      {/* Targetes de KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Patrimoni Total</CardTitle>
-            <Landmark className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatEuros(kpis.patrimoni)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Ingressos (Mes)</CardTitle>
-            <ArrowUpRight className="w-4 h-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatEuros(kpis.ingressos)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Despeses (Mes)</CardTitle>
-            <ArrowDownRight className="w-4 h-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-500">{formatEuros(kpis.despeses)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Flux Net</CardTitle>
-            <Wallet className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${kpis.fluxNet >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-              {kpis.fluxNet > 0 ? '+' : ''}{formatEuros(kpis.fluxNet)}
+      {/* ── KPI CARDS ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Patrimoni — neutral, anchoring */}
+        <div className={cn(card, "p-6 flex flex-col gap-5")}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Patrimoni Total</p>
+            <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+              <Landmark className="w-4 h-4 text-slate-500 dark:text-slate-400" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-3xl font-bold text-slate-900 dark:text-white tabular-nums tracking-tight leading-none">
+            {formatEuros(kpis.patrimoni)}
+          </p>
+        </div>
+
+        {/* Ingressos — green */}
+        <div className={cn(card, "p-6 flex flex-col gap-5 border-l-4 border-l-emerald-500")}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Ingressos</p>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+              <ArrowUpRight className="w-4 h-4 text-emerald-600" />
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-emerald-600 tabular-nums tracking-tight leading-none">
+            {formatEuros(kpis.ingressos)}
+          </p>
+        </div>
+
+        {/* Despeses — rose */}
+        <div className={cn(card, "p-6 flex flex-col gap-5 border-l-4 border-l-rose-500")}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Despeses</p>
+            <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center shrink-0">
+              <ArrowDownRight className="w-4 h-4 text-rose-600" />
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-rose-600 tabular-nums tracking-tight leading-none">
+            {formatEuros(kpis.despeses)}
+          </p>
+        </div>
+
+        {/* Flux Net — dynamic color */}
+        <div className={cn(
+          card, "p-6 flex flex-col gap-5",
+          kpis.fluxNet >= 0 ? "border-l-4 border-l-indigo-500" : "border-l-4 border-l-rose-500"
+        )}>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Flux Net</p>
+            <div className={cn(
+              "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
+              kpis.fluxNet >= 0 ? "bg-indigo-50 dark:bg-indigo-900/30" : "bg-rose-50 dark:bg-rose-900/30"
+            )}>
+              <Activity className={cn("w-4 h-4", kpis.fluxNet >= 0 ? "text-indigo-600" : "text-rose-600")} />
+            </div>
+          </div>
+          <div className="flex items-end justify-between gap-2">
+            <p className={cn(
+              "text-3xl font-bold tabular-nums tracking-tight leading-none",
+              kpis.fluxNet >= 0 ? "text-indigo-600" : "text-rose-600"
+            )}>
+              {kpis.fluxNet > 0 ? "+" : ""}{formatEuros(kpis.fluxNet)}
+            </p>
+            {kpis.ingressos > 0 && (
+              <span className={cn(
+                "text-xs font-bold px-2.5 py-1 rounded-full border mb-0.5 shrink-0",
+                savingsRate >= 0
+                  ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                  : "text-rose-700 bg-rose-50 border-rose-200"
+              )}>
+                {savingsRate > 0 ? "+" : ""}{savingsRate}%
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Daily Evolution Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Evolucio Diaria</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-72">
+      {/* ── CHART ──────────────────────────────────────────────────────────── */}
+      <div className={card}>
+        <div className="flex items-center justify-between px-7 pt-6 pb-5 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Evolució Diària</h2>
+            <p className="text-sm text-slate-400 mt-0.5">{nomMesActual}</p>
+          </div>
+          <div className="flex items-center gap-6 text-sm font-medium text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+              Ingressos
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+              Despeses
+            </span>
+          </div>
+        </div>
+        <div className="px-4 pt-4 pb-2">
+          <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={dailyEvolution} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <AreaChart data={dailyEvolution} margin={{ top: 5, right: 8, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradIngressos" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradDespeses" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.15} />
+                    <stop offset="100%" stopColor="#f43f5e" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={theme === "dark" ? "#1e293b" : "#f1f5f9"} />
                 <XAxis
-                  dataKey="day"
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(val) => `${val}`}
+                  dataKey="day" axisLine={false} tickLine={false}
+                  tick={{ fontSize: 12, fill: "#94a3b8" }} dy={8} interval={4}
                 />
                 <YAxis
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(val) => formatEuros(val)}
-                  width={90}
+                  axisLine={false} tickLine={false}
+                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                  tickFormatter={(v) => `€${v}`}
                 />
-                <Tooltip
-                  formatter={(value: number | string | undefined, name?: string) => [
-                    formatEuros(Number(value ?? 0)),
-                    name === 'ingressos' ? 'Ingressos' : 'Despeses'
-                  ]}
-                  labelFormatter={(label) => `Dia ${label}`}
-                />
-                <Legend
-                  formatter={(value) => value === 'ingressos' ? 'Ingressos' : 'Despeses'}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="ingressos"
-                  stroke="#16a34a"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="despeses"
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              </LineChart>
+                <Tooltip content={<ChartTooltip nomMes={nomMesActual} />} />
+                <Area type="monotone" dataKey="ingressos" stroke="#10b981" strokeWidth={2.5}
+                  fill="url(#gradIngressos)" dot={false} activeDot={{ r: 5, fill: "#10b981", strokeWidth: 0 }} />
+                <Area type="monotone" dataKey="despeses" stroke="#f43f5e" strokeWidth={2.5}
+                  fill="url(#gradDespeses)" dot={false} activeDot={{ r: 5, fill: "#f43f5e", strokeWidth: 0 }} />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Resum de Comptes */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Els teus comptes</CardTitle>
-            <Link to="/comptes" className="text-sm text-primary hover:underline">
-              Gestionar
-            </Link>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {accounts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No tens cap compte actiu.</p>
-            ) : (
-              accounts.map(acc => (
-                <div
-                  key={acc.id}
-                  className="flex items-center justify-between p-3 border rounded-lg bg-card/50 cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => handleAccountClick(acc.id)}
-                >
+      {/* ── ACCOUNTS ───────────────────────────────────────────────────────── */}
+      {accounts.length > 0 && (
+        <div className={cn(
+          "grid gap-4",
+          accounts.length === 1 ? "grid-cols-1" :
+          accounts.length === 2 ? "grid-cols-2" :
+          accounts.length === 3 ? "grid-cols-3" :
+          accounts.length === 4 ? "grid-cols-4" : "grid-cols-5"
+        )}>
+          {accounts.map(acc => {
+            const pct = kpis.patrimoni > 0 ? Math.round((acc.saldo / kpis.patrimoni) * 100) : 0
+            return (
+              <button
+                key={acc.id}
+                onClick={() => handleAccountClick(acc)}
+                className={cn(
+                  "group flex flex-col justify-between gap-7 p-6 text-left w-full",
+                  "rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900 overflow-hidden relative",
+                  "hover:shadow-xl hover:-translate-y-1 transition-all duration-200",
+                  "shadow-[0_1px_4px_rgba(15,23,42,0.05),0_6px_24px_rgba(15,23,42,0.06)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3),0_6px_24px_rgba(0,0,0,0.3)]"
+                )}
+              >
+                {/* Top color strip using account color */}
+                <div className="absolute top-0 left-0 right-0 h-1" style={{ backgroundColor: acc.color }} />
+
+                <div className="flex items-center justify-between mt-1">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: `${acc.color}15`, color: acc.color }}>
+                    <Wallet className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                    {ACCOUNT_TYPE_LABELS[acc.tipus] ?? acc.tipus}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-400 mb-1.5 truncate">{acc.nom}</p>
+                    <p className="font-bold text-[2rem] text-slate-900 dark:text-white tabular-nums tracking-tight truncate leading-none">
+                      {formatEuros(acc.saldo)}
+                    </p>
+                  </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: acc.color || '#ccc' }} />
-                    <span className="font-medium">{acc.nom}</span>
-                  </div>
-                  <span className="font-semibold tabular-nums">{formatEuros(acc.saldo)}</span>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Ultims Moviments */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Ultims Moviments</CardTitle>
-            <Link to="/transaccions" className="text-sm text-primary hover:underline">
-              Veure tot
-            </Link>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {ultimsMoviments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Cap moviment aquest mes.</p>
-            ) : (
-              ultimsMoviments.map(tx => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between border-b last:border-0 pb-3 last:pb-0 cursor-pointer hover:bg-muted/50 transition-colors p-2 rounded-md -mx-2"
-                  onClick={() => handleTransactionClick(tx)}
-                >
-                  <div className="min-w-0 pr-4">
-                    <p className={`font-medium text-sm truncate ${tx.isEvent ? 'text-primary' : ''}`}>
-                      {tx.concepte}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {formatDate(tx.data)} • {tx.isEvent ? 'Despesa agrupada' : `${tx.compte_nom} • ${tx.categoria_nom || 'Sense categoria'}`}
-                    </p>
-                  </div>
-                  <div className={`font-semibold text-sm tabular-nums shrink-0 ${
-                    tx.tipus === 'ingres' ? 'text-green-600' :
-                    tx.tipus === 'despesa' ? 'text-red-500' : 'text-blue-500'
-                  }`}>
-                    {tx.tipus === 'ingres' ? '+' : tx.tipus === 'despesa' ? '-' : ''}{formatEuros(tx.import_trs)}
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Category Breakdown with Toggle */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Per Categoria</CardTitle>
-              <div className="flex gap-1 rounded-lg border p-0.5">
-                <button
-                  onClick={() => setCategoryView("despesa")}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                    categoryView === "despesa"
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted"
-                  }`}
-                >
-                  Despeses
-                </button>
-                <button
-                  onClick={() => setCategoryView("ingres")}
-                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                    categoryView === "ingres"
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted"
-                  }`}
-                >
-                  Ingressos
-                </button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {categoryBreakdown.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {categoryView === "despesa" ? "Cap despesa aquest mes." : "Cap ingres aquest mes."}
-              </p>
-            ) : (
-              categoryBreakdown.map(cat => {
-                const percentage = cat.pressupost_mensual && cat.pressupost_mensual > 0
-                  ? (cat.total / cat.pressupost_mensual) * 100
-                  : null
-
-                const barColor = percentage !== null
-                  ? percentage > 100
-                    ? 'bg-red-500'
-                    : percentage >= 80
-                      ? 'bg-yellow-500'
-                      : 'bg-green-500'
-                  : 'bg-primary'
-
-                return (
-                  <div key={cat.id} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div
-                          className="w-3 h-3 rounded-full shrink-0"
-                          style={{ backgroundColor: cat.color }}
-                        />
-                        <span className="text-sm font-medium truncate">{cat.nom}</span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-sm font-semibold tabular-nums">
-                          {formatEuros(cat.total)}
-                        </span>
-                        {cat.pressupost_mensual && cat.pressupost_mensual > 0 && (
-                          <span className="text-xs text-muted-foreground tabular-nums">
-                            / {formatEuros(cat.pressupost_mensual)}
-                          </span>
-                        )}
-                      </div>
+                    <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: acc.color }} />
                     </div>
-
-                    {/* Progress bar for expense categories with budget */}
-                    {categoryView === "despesa" && percentage !== null && (
-                      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${barColor}`}
-                          style={{ width: `${Math.min(percentage, 100)}%` }}
-                        />
-                      </div>
-                    )}
+                    <span className="text-xs font-semibold text-slate-400 shrink-0 tabular-nums w-8 text-right">
+                      {pct}%
+                    </span>
                   </div>
-                )
-              })
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── BOTTOM TWO-COLUMN ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <CategoriesCard
+          className="lg:col-span-4"
+          despeses={expensesBreakdown}
+          ingressos={incomesBreakdown}
+          totalDespeses={kpis.despeses}
+          totalIngressos={kpis.ingressos}
+          nomMes={nomMesActual}
+        />
+        <MovimentsCard
+          className="lg:col-span-8"
+          transactions={ultimsMoviments}
+          onTransactionClick={handleTransactionClick}
+        />
       </div>
 
       <ImportCsvModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onSuccess={() => {
-          setShowImportModal(false)
-          window.location.reload()
-        }}
+        onSuccess={() => { setShowImportModal(false); window.location.reload() }}
         accounts={accounts}
         categories={categories}
         events={events}
+        eventTags={eventTags}
+        people={people}
         rules={rules}
+      />
+
+      <TransactionModal
+        isOpen={showTransactionModal}
+        onClose={() => setShowTransactionModal(false)}
+        onSuccess={() => { setShowTransactionModal(false); window.location.reload() }}
+        accounts={accounts}
+        categories={categories}
+        people={people}
+        events={events}
+      />
+
+      <EntityTransactionsModal
+        isOpen={!!txEntity}
+        onClose={() => setTxEntity(null)}
+        entity={txEntity}
       />
     </div>
   )
