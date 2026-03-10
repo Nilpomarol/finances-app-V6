@@ -8,7 +8,7 @@ import { getPersonHistory, type PersonHistoryItem } from "@/lib/db/queries/peopl
 import { useAuthStore } from "@/store/authStore"
 import type { Person } from "@/types/database"
 import { formatDate, formatEuros } from "@/lib/utils"
-import { X, ArrowDownLeft, ArrowUpRight, Copy, Check } from "lucide-react"
+import { X, ArrowDownLeft, ArrowUpRight, UserCheck, ArrowLeftRight, Copy, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface PersonHistoryModalProps {
@@ -19,13 +19,13 @@ interface PersonHistoryModalProps {
 
 function getDeutes(history: PersonHistoryItem[]): PersonHistoryItem[] {
   // history is sorted date DESC — take only debts before the first liquidacio
-  const settleIdx = history.findIndex(i => String(i.tipus) === "liquidacio")
+  const settleIdx = history.findIndex(i =>
+    String(i.tipus) === "liquidacio" || String(i.tipus) === "pagat_a"
+  )
   if (settleIdx === -1) {
-    // No settle-up ever — return all debts
-    return history.filter(i => String(i.tipus) === "deute")
+    return history.filter(i => String(i.tipus) === "deute" || String(i.tipus) === "pagat_per_altri")
   }
-  // Return only debts that appear before (i.e. more recent than) the last settle-up
-  return history.slice(0, settleIdx).filter(i => String(i.tipus) === "deute")
+  return history.slice(0, settleIdx).filter(i => String(i.tipus) === "deute" || String(i.tipus) === "pagat_per_altri")
 }
 
 function buildCopyText(items: PersonHistoryItem[]): string {
@@ -184,11 +184,19 @@ export default function PersonHistoryModal({ isOpen, onClose, person }: PersonHi
                       "w-9 h-9 rounded-xl flex items-center justify-center shrink-0",
                       String(item.tipus) === "deute"
                         ? "bg-rose-500/10 text-rose-500"
+                        : String(item.tipus) === "pagat_per_altri"
+                        ? "bg-violet-500/10 text-violet-500"
+                        : String(item.tipus) === "pagat_a"
+                        ? "bg-orange-500/10 text-orange-500"
                         : "bg-emerald-500/10 text-emerald-600"
                     )}
                   >
                     {String(item.tipus) === "deute"
                       ? <ArrowDownLeft className="w-4 h-4" />
+                      : String(item.tipus) === "pagat_per_altri"
+                      ? <UserCheck className="w-4 h-4" />
+                      : String(item.tipus) === "pagat_a"
+                      ? <ArrowLeftRight className="w-4 h-4" />
                       : <ArrowUpRight className="w-4 h-4" />
                     }
                   </div>
@@ -198,15 +206,24 @@ export default function PersonHistoryModal({ isOpen, onClose, person }: PersonHi
                       {item.concepte}
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      {formatDate(item.data)} · {String(item.tipus) === "deute" ? "Deute generat" : "Liquidació"}
+                      {formatDate(item.data)} ·{" "}
+                      {String(item.tipus) === "deute"
+                        ? "Deute generat"
+                        : String(item.tipus) === "pagat_per_altri"
+                        ? "Pagat per ell/ella"
+                        : String(item.tipus) === "pagat_a"
+                        ? "Pagament teu"
+                        : "Liquidació"}
                     </p>
                   </div>
 
                   <span className={cn(
                     "text-sm font-bold tabular-nums shrink-0",
-                    String(item.tipus) === "deute" ? "text-rose-500" : "text-emerald-600"
+                    String(item.tipus) === "deute" || String(item.tipus) === "pagat_per_altri"
+                      ? "text-rose-500"
+                      : "text-emerald-600"
                   )}>
-                    {String(item.tipus) === "deute" ? "+" : "−"}{formatEuros(Number(item.import))}
+                    {String(item.tipus) === "deute" || String(item.tipus) === "pagat_per_altri" ? "+" : "−"}{formatEuros(Number(item.import))}
                   </span>
                 </div>
               ))}

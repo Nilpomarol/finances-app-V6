@@ -74,6 +74,9 @@ function SkeletonRow({
 }) {
   return (
     <tr className="border-b border-slate-100 dark:border-slate-800 last:border-0">
+      <td className="px-3 py-3.5 w-[90px]">
+        <div className="h-3.5 bg-slate-100 dark:bg-slate-800 rounded-full w-16 animate-pulse" />
+      </td>
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse shrink-0" />
@@ -82,9 +85,6 @@ function SkeletonRow({
             <div className="h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full w-20 animate-pulse" />
           </div>
         </div>
-      </td>
-      <td className="px-5 py-3.5">
-        <div className="h-3.5 bg-slate-100 dark:bg-slate-800 rounded-full w-20 animate-pulse" />
       </td>
       {showAccount && (
         <td className="px-5 py-3.5 hidden md:table-cell">
@@ -129,8 +129,8 @@ export default function TransactionTable({
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800">
+              <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 w-[90px]">Data</th>
               <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Transacció</th>
-              <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Data</th>
               {showAccount && <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 hidden md:table-cell">Compte</th>}
               {showCategory && <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 hidden lg:table-cell">Categoria</th>}
               <th className="text-right px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Import</th>
@@ -170,11 +170,11 @@ export default function TransactionTable({
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800">
-                <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                  Transacció
+                <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 w-[90px]">
+                  Data
                 </th>
                 <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-                  Data
+                  Transacció
                 </th>
                 {showAccount && (
                   <th className="text-left px-5 py-3 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 hidden md:table-cell">
@@ -219,6 +219,13 @@ export default function TransactionTable({
                         : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     )}
                   >
+                    {/* ── Data ── */}
+                    <td className="px-3 py-3.5 whitespace-nowrap w-[90px]">
+                      <span className="text-sm text-slate-500 dark:text-slate-400 tabular-nums">
+                        {formatDate(tx.data)}
+                      </span>
+                    </td>
+
                     {/* ── Transacció ── */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3 min-w-0">
@@ -263,13 +270,6 @@ export default function TransactionTable({
                       </div>
                     </td>
 
-                    {/* ── Data ── */}
-                    <td className="px-5 py-3.5 whitespace-nowrap">
-                      <span className="text-sm text-slate-500 dark:text-slate-400 tabular-nums">
-                        {formatDate(tx.data)}
-                      </span>
-                    </td>
-
                     {/* ── Compte ── */}
                     {showAccount && (
                       <td className="px-5 py-3.5 hidden md:table-cell">
@@ -298,6 +298,11 @@ export default function TransactionTable({
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tx.compte_color ?? "#6366f1" }} />
                             <span className="text-sm text-slate-600 dark:text-slate-300 truncate max-w-[120px]">{tx.compte_nom}</span>
+                          </div>
+                        ) : tx.pagat_per_nom ? (
+                          <div className="flex items-center gap-2">
+                            <Users className="w-3 h-3 shrink-0 text-violet-400 dark:text-violet-500" />
+                            <span className="text-sm text-slate-500 dark:text-slate-400 truncate max-w-[120px] italic">{tx.pagat_per_nom}</span>
                           </div>
                         ) : (
                           <span className="text-slate-300 dark:text-slate-600 text-sm">—</span>

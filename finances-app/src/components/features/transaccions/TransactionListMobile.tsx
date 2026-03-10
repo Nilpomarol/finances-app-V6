@@ -203,16 +203,23 @@ function TransactionRow({
                   </span>
                 </>
               )}
-              {tx.compte_nom && (
+              {(tx.compte_nom || tx.pagat_per_nom) && (
                 <>
                   <span className="text-[11px] text-slate-300 dark:text-slate-700 shrink-0">·</span>
-                  <span className="flex items-center gap-0.5 text-[11px] text-slate-400 dark:text-slate-500 shrink-0">
-                    <span
-                      className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ backgroundColor: tx.compte_color ?? "#6366f1" }}
-                    />
-                    <span className="truncate max-w-[65px]">{tx.compte_nom}</span>
-                  </span>
+                  {tx.compte_nom ? (
+                    <span className="flex items-center gap-0.5 text-[11px] text-slate-400 dark:text-slate-500 shrink-0">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: tx.compte_color ?? "#6366f1" }}
+                      />
+                      <span className="truncate max-w-[65px]">{tx.compte_nom}</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-0.5 text-[11px] text-slate-400 dark:text-slate-500 shrink-0 italic">
+                      <Users className="w-2.5 h-2.5 shrink-0 text-violet-400" />
+                      <span className="truncate max-w-[65px]">{tx.pagat_per_nom}</span>
+                    </span>
+                  )}
                 </>
               )}
             </>

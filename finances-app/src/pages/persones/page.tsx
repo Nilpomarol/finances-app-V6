@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Plus, Users, MoreHorizontal, Pencil, Trash2, CheckCircle2, Pin, PinOff } from "lucide-react"
 import { cn, formatEuros } from "@/lib/utils"
 import { PageHeader } from "@/components/shared/PageHeader"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 
 const PINNED_KEY = "persones_pinned"
 
@@ -33,6 +34,7 @@ export default function PersonesPage() {
   const [editingPerson, setEditingPerson] = useState<Person | undefined>()
   const [settlePerson, setSettlePerson] = useState<(Person & { balance: number }) | null>(null)
   const [historyPerson, setHistoryPerson] = useState<(Person & { balance: number }) | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; action: () => void }>({ open: false, title: "", action: () => {} })
 
   const loadData = useCallback(async () => {
     if (!userId) return
@@ -54,11 +56,18 @@ export default function PersonesPage() {
     return () => document.removeEventListener("click", handler)
   }, [openMenuId])
 
-  const handleDelete = async (person: Person) => {
-    if (!userId || !confirm(`Eliminar a ${person.nom}?`)) return
+  const handleDelete = (person: Person) => {
+    if (!userId) return
     setOpenMenuId(null)
-    await deletePerson(person.id, userId)
-    loadData()
+    setConfirmDialog({
+      open: true,
+      title: `Eliminar a ${person.nom}?`,
+      action: async () => {
+        setConfirmDialog(d => ({ ...d, open: false }))
+        await deletePerson(person.id, userId)
+        loadData()
+      },
+    })
   }
 
   const togglePin = (id: string) => {
@@ -88,11 +97,8 @@ export default function PersonesPage() {
         title="Persones i Deutes"
         subtitle={`${visible.length} contactes`}
         action={
-          <Button
-            onClick={() => { setEditingPerson(undefined); setShowModal(true) }}
-            className="h-9 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-sm shadow-sm"
-          >
-            <Plus className="w-4 h-4 mr-1.5" /> Nova persona
+          <Button onClick={() => { setEditingPerson(undefined); setShowModal(true) }}>
+            <Plus className="w-4 h-4 mr-2" /> Nova persona
           </Button>
         }
       />
@@ -277,6 +283,14 @@ export default function PersonesPage() {
         isOpen={!!historyPerson}
         onClose={() => setHistoryPerson(null)}
         person={historyPerson}
+      />
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        confirmText="Eliminar"
+        onConfirm={confirmDialog.action}
+        onCancel={() => setConfirmDialog(d => ({ ...d, open: false }))}
       />
     </div>
   )

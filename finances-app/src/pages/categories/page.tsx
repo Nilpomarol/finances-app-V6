@@ -9,19 +9,21 @@ import { Button } from "@/components/ui/button"
 import { Plus, Tag, TrendingDown, TrendingUp, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/shared/PageHeader"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import EntityTransactionsModal from "@/components/shared/EntityTransactionsModal"
 import type { EntityTransactionsEntity } from "@/components/shared/EntityTransactionsModal"
 
 export default function CategoriesPage() {
   const { userId } = useAuthStore()
   const [categories, setCategories] = useState<Category[]>([])
-  const [monthSummary, setMonthSummary] = useState<Array<{ categoria_id: string; total: number }>>([])
+  const [monthSummary, setMonthSummary] = useState<Array<{ categoria_id: string; total: number; total_any: number; count_any: number; count_mes: number }>>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<"despesa" | "ingres">("despesa")
   const [showModal, setShowModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | undefined>()
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [txEntity, setTxEntity] = useState<EntityTransactionsEntity | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; description?: string; action: () => void }>({ open: false, title: "", action: () => {} })
 
   const loadData = useCallback(async () => {
     if (!userId) return
@@ -56,13 +58,22 @@ export default function CategoriesPage() {
   const handleDelete = async (cat: Category) => {
     if (!userId) return
     setOpenMenuId(null)
-    if (!confirm(`Eliminar la categoria "${cat.nom}"? Les transaccions associades quedaran sense categoria.`)) return
-    await deleteCategory(cat.id, userId)
-    loadData()
+    setConfirmDialog({
+      open: true,
+      title: `Eliminar la categoria "${cat.nom}"?`,
+      description: "Les transaccions associades quedaran sense categoria.",
+      action: async () => {
+        setConfirmDialog(d => ({ ...d, open: false }))
+        await deleteCategory(cat.id, userId)
+        loadData()
+      },
+    })
   }
 
-  const getMonthTotal = (categoryId: string) =>
-    monthSummary.find((s) => s.categoria_id === categoryId)?.total ?? 0
+  const getSummary = (categoryId: string) =>
+    monthSummary.find((s) => s.categoria_id === categoryId) ?? { total: 0, total_any: 0, count_any: 0, count_mes: 0 }
+
+  const getMonthTotal = (categoryId: string) => getSummary(categoryId).total
 
   const getBudgetStatus = (cat: Category) => {
     if (!cat.pressupost_mensual || cat.tipus !== "despesa") return null
@@ -72,7 +83,10 @@ export default function CategoriesPage() {
     return "green"
   }
 
-  const filtered = categories.filter((c) => c.tipus === activeTab)
+  const filtered = categories
+    .filter((c) => c.tipus === activeTab)
+    .sort((a, b) => getSummary(b.id).total_any - getSummary(a.id).total_any)
+  const totalAnyAll = filtered.reduce((sum, c) => sum + getSummary(c.id).total_any, 0)
   const despesaCount = categories.filter((c) => c.tipus === "despesa").length
   const ingresCount = categories.filter((c) => c.tipus === "ingres").length
 
@@ -83,11 +97,8 @@ export default function CategoriesPage() {
         title="Categories"
         subtitle={`${categories.length} categories configurades`}
         action={
-          <Button
-            onClick={() => { setEditingCategory(undefined); setShowModal(true) }}
-            className="h-9 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-sm shadow-sm"
-          >
-            <Plus className="w-4 h-4 mr-1.5" /> Nova categoria
+          <Button onClick={() => { setEditingCategory(undefined); setShowModal(true) }}>
+            <Plus className="w-4 h-4 mr-2" /> Nova categoria
           </Button>
         }
       />
@@ -164,7 +175,8 @@ export default function CategoriesPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {filtered.map((cat) => {
-            const monthTotal = getMonthTotal(cat.id)
+            const { total: monthTotal, total_any, count_any, count_mes } = getSummary(cat.id)
+            const yearPct = totalAnyAll > 0 ? (total_any / totalAnyAll) * 100 : 0
             const budgetStatus = getBudgetStatus(cat)
             const pct = cat.pressupost_mensual
               ? Math.min((monthTotal / cat.pressupost_mensual) * 100, 100) : 0
@@ -246,6 +258,7 @@ export default function CategoriesPage() {
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-slate-400 tabular-nums">
                             {formatEuros(monthTotal)} gastats
+                            {count_mes > 0 && <span className="ml-1 opacity-70">({count_mes} transacc.)</span>}
                           </span>
                           <span className={cn(
                             "font-semibold tabular-nums",
@@ -267,20 +280,51 @@ export default function CategoriesPage() {
                             style={{ width: `${pct}%` }}
                           />
                         </div>
+                        {count_any > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center text-[11px] text-slate-400 tabular-nums">
+                              <span>{formatEuros(total_any)} · {count_any} transacc. enguany</span>
+                              <span>{yearPct.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500 opacity-50"
+                                style={{ width: `${yearPct}%`, backgroundColor: cat.color }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-400 mt-1 tabular-nums">
-                        {monthTotal > 0 ? (
-                          <>
-                            <span className="font-semibold" style={{ color: cat.color }}>
-                              {formatEuros(monthTotal)}
-                            </span>
-                            {" aquest mes"}
-                          </>
-                        ) : (
-                          "Sense activitat aquest mes"
+                      <div className="mt-1 space-y-1">
+                        <p className="text-xs text-slate-400 tabular-nums">
+                          {monthTotal > 0 ? (
+                            <>
+                              <span className="font-semibold" style={{ color: cat.color }}>
+                                {formatEuros(monthTotal)}
+                              </span>
+                              {" aquest mes"}
+                              {count_mes > 0 && <span className="ml-1 opacity-70">({count_mes} transacc.)</span>}
+                            </>
+                          ) : (
+                            "Sense activitat aquest mes"
+                          )}
+                        </p>
+                        {count_any > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center text-[11px] text-slate-400 tabular-nums">
+                              <span>{formatEuros(total_any)} · {count_any} transacc. enguany</span>
+                              <span>{yearPct.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500 opacity-50"
+                                style={{ width: `${yearPct}%`, backgroundColor: cat.color }}
+                              />
+                            </div>
+                          </div>
                         )}
-                      </p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -315,6 +359,15 @@ export default function CategoriesPage() {
         isOpen={!!txEntity}
         onClose={() => setTxEntity(null)}
         entity={txEntity}
+      />
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText="Eliminar"
+        onConfirm={confirmDialog.action}
+        onCancel={() => setConfirmDialog(d => ({ ...d, open: false }))}
       />
     </div>
   )

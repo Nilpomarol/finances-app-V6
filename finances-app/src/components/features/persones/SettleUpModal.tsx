@@ -28,6 +28,9 @@ export default function SettleUpModal({
   const [amount, setAmount] = useState(Math.round(Math.abs(person.balance) * 100) / 100)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // balance > 0 → they owe you → INGRES; balance < 0 → you owe them → DESPESA
+  const youOweThem = person.balance < 0
+
   const initials = person.nom.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)
 
   const handleSettle = async () => {
@@ -35,16 +38,16 @@ export default function SettleUpModal({
     setIsSubmitting(true)
     try {
       await createTransaction(userId, {
-        tipus: "ingres",
+        tipus: youOweThem ? "despesa" : "ingres",
         concepte: `Liquidació: ${person.nom}`,
         import_trs: amount,
         data: now(),
         compte_id: targetAccountId,
         liquidacio_persona_id: person.id,
         recurrent: false,
-        notes: `Retorn de deute acumulat`,
+        notes: youOweThem ? `Pagament de deute acumulat` : `Retorn de deute acumulat`,
       })
-      toast.success(`S'ha registrat el retorn de ${formatEuros(amount)}`)
+      toast.success(`S'ha registrat el pagament de ${formatEuros(amount)}`)
       onSuccess()
       onClose()
     } catch {
@@ -85,7 +88,7 @@ export default function SettleUpModal({
           {/* Import */}
           <div className="px-4 pt-3 pb-3 space-y-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-              Import que et torna
+              {youOweThem ? "Import que li tornes" : "Import que et torna"}
             </p>
             <div className="flex items-center gap-2">
               <span className="text-sm text-slate-400 dark:text-slate-500 font-medium">€</span>
@@ -104,7 +107,7 @@ export default function SettleUpModal({
           {/* Compte */}
           <div className="px-4 pt-3 pb-3 space-y-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-              A quin compte reps els diners?
+              {youOweThem ? "Des de quin compte fas el pagament?" : "A quin compte reps els diners?"}
             </p>
             <select
               value={targetAccountId}
@@ -124,7 +127,11 @@ export default function SettleUpModal({
           <Button
             onClick={handleSettle}
             disabled={isSubmitting || !targetAccountId || amount <= 0}
-            className="w-full h-12 text-base font-semibold rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white"
+            className={`w-full h-12 text-base font-semibold rounded-xl text-white ${
+              youOweThem
+                ? "bg-violet-500 hover:bg-violet-600"
+                : "bg-emerald-500 hover:bg-emerald-600"
+            }`}
           >
             {isSubmitting
               ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />

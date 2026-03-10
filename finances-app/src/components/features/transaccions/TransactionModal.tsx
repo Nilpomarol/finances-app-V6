@@ -32,7 +32,7 @@ const formSchema = z.object({
   concepte: z.string().min(2, "El concepte ha de tenir almenys 2 caràcters"),
   import_trs: z.coerce.number().positive("L'import ha de ser superior a 0"),
   data: z.coerce.number(),
-  compte_id: z.string().min(1, "Has de seleccionar un compte"),
+  compte_id: z.string().optional().default(""),
   compte_desti_id: z.string().optional(),
   categoria_id: z.string().optional(),
   esdeveniment_id: z.string().optional().nullable(),
@@ -44,7 +44,12 @@ const formSchema = z.object({
     import_degut: z.coerce.number().positive("L'import ha de ser superior a 0"),
   })).optional().default([]),
   liquidacio_persona_id: z.string().optional().nullable(),
+  pagat_per_id: z.string().optional().nullable(),
 }).superRefine((data, ctx) => {
+  const pagatPerAltri = data.pagat_per_id && data.pagat_per_id !== "none"
+  if (!pagatPerAltri && !data.compte_id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Has de seleccionar un compte", path: ["compte_id"] })
+  }
   if (data.tipus === "transferencia") {
     if (!data.compte_desti_id)
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El compte destí és obligatori", path: ["compte_desti_id"] })
@@ -76,6 +81,7 @@ const defaultValues: TransactionFormValues = {
   recurrent: false,
   deutes: [],
   liquidacio_persona_id: null,
+  pagat_per_id: null,
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -88,11 +94,14 @@ interface TransactionModalProps {
   people?: { id: string; nom: string }[]
   events?: { id: string; nom: string; tipus: string }[]
   onSuccess?: () => void
+  defaultEventId?: string | null
+  defaultDate?: number
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function TransactionModal({
   isOpen, onClose, transactionToEdit, accounts, categories, people = [], events = [], onSuccess,
+  defaultEventId, defaultDate,
 }: TransactionModalProps) {
   const { toast } = useToast()
   const user_id = useAuthStore((state) => state.userId)
@@ -107,8 +116,15 @@ export default function TransactionModal({
   const currentTipus = form.watch("tipus")
   const currentImport = Number(form.watch("import_trs") ?? 0)
   const currentEventId = form.watch("esdeveniment_id")
+  const currentPagatPerId = form.watch("pagat_per_id")
 
-  // Load event tags when selected event changes
+  // When "pagat per altri" is selected and no account is set, auto-pick the first one
+  // (won't affect balances, but compte_id is required by the DB)
+  useEffect(() => {
+    if (currentPagatPerId && currentPagatPerId !== "none" && !form.getValues("compte_id") && accounts.length > 0) {
+      form.setValue("compte_id", accounts[0].id)
+    }
+  }, [currentPagatPerId, accounts, form])
   useEffect(() => {
     async function loadTags() {
       if (!currentEventId || currentEventId === "none" || !user_id) {
@@ -145,6 +161,7 @@ export default function TransactionModal({
         recurrent: Boolean(transactionToEdit.recurrent),
         deutes: [],
         liquidacio_persona_id: transactionToEdit.liquidacio_persona_id || null,
+        pagat_per_id: transactionToEdit.pagat_per_id || null,
       })
       if (transactionToEdit.tipus === "despesa") {
         setIsLoadingSplits(true)
@@ -155,7 +172,11 @@ export default function TransactionModal({
         })
       }
     } else if (isOpen) {
-      form.reset({ ...defaultValues, data: now() })
+      form.reset({
+        ...defaultValues,
+        data: defaultDate ?? now(),
+        esdeveniment_id: defaultEventId ?? null,
+      })
       setAvailableTags([])
     }
   }, [transactionToEdit, isOpen, form])
@@ -163,17 +184,19 @@ export default function TransactionModal({
   const onSubmit = async (values: TransactionFormValues) => {
     if (!user_id) return
     try {
+      const pagatPerAltri = values.tipus === "despesa" && !!values.pagat_per_id && values.pagat_per_id !== "none"
       const finalValues: TransactionData = {
         concepte: values.concepte,
         data: values.data,
         import_trs: values.import_trs,
         tipus: values.tipus,
-        compte_id: values.compte_id,
+        compte_id: pagatPerAltri ? null : (values.compte_id || null),
         compte_desti_id: values.tipus === "transferencia" ? values.compte_desti_id || null : null,
         categoria_id: values.tipus === "transferencia" ? null : values.categoria_id || null,
         esdeveniment_id: values.esdeveniment_id === "none" ? null : values.esdeveniment_id ?? null,
         event_tag_id: values.event_tag_id === "none" ? null : values.event_tag_id ?? null,
         liquidacio_persona_id: values.liquidacio_persona_id === "none" ? null : values.liquidacio_persona_id,
+        pagat_per_id: values.tipus === "despesa" ? (values.pagat_per_id === "none" ? null : values.pagat_per_id ?? null) : null,
         recurrent: values.recurrent ?? false,
         notes: values.notes ?? null,
         deutes: values.deutes ?? [],
@@ -229,6 +252,7 @@ export default function TransactionModal({
                 accounts={accounts}
                 categories={categories}
                 currentTipus={currentTipus}
+                pagatPerId={currentPagatPerId}
               />
               {currentTipus === "despesa" && people.length > 0 && !isLoadingSplits && (
                 <SplitSection people={people} currentImport={currentImport} />
@@ -241,6 +265,9 @@ export default function TransactionModal({
                   events={events}
                   availableTags={availableTags}
                   currentEventId={currentEventId}
+                  defaultOpen={!!defaultEventId}
+                  people={people}
+                  currentTipus={currentTipus}
                 />
               )}
 

@@ -4,8 +4,6 @@ import { Toaster } from "sonner"
 import AuthGuard from "@/components/features/auth/AuthGuard"
 import Sidebar from "@/components/layout/Sidebar"
 import MobileNav from "@/components/layout/MobileNav"
-import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
 
 // Importacions necessàries per carregar les dades de la BD
 import { useAuthStore } from "@/store/authStore"
@@ -53,16 +51,7 @@ export default function Layout() {
           </main>
         </div>
 
-        <MobileNav />
-
-        {/* Botó flotant en vista mòbil */}
-        <Button
-          size="icon"
-          className="md:hidden fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg z-50"
-          onClick={() => setShowTransactionModal(true)}
-        >
-          <Plus className="w-6 h-6" />
-        </Button>
+        <MobileNav onNewTransaction={() => setShowTransactionModal(true)} />
 
         {/* El Modal Global ara rep les dades reals */}
         <Suspense fallback={null}>

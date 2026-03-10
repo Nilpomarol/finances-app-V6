@@ -27,8 +27,10 @@ import {
   ArrowLeftRight,
   X,
   CalendarDays,
+  Users,
 } from "lucide-react"
 import { PageHeader } from "@/components/shared/PageHeader"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 import { getEvents } from "@/lib/db/queries/events"
 import { cn } from "@/lib/utils"
 
@@ -61,6 +63,7 @@ export default function TransaccionsPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<TransactionWithRelations | undefined>()
   const [viewingTransaction, setViewingTransaction] = useState<TransactionWithRelations | null>(null)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; action: () => void }>({ open: false, title: "", action: () => {} })
 
   const hasActiveFilters =
     search.trim() !== "" ||
@@ -98,16 +101,20 @@ export default function TransaccionsPage() {
     try {
       const data = await getTransactions({
         userId,
-        compteId: filterCompte !== "all" ? filterCompte : undefined,
+        compteId: filterCompte !== "all" && filterCompte !== "__pagat_per_altri__" ? filterCompte : undefined,
         categoriaId: filterCategoria !== "all" ? filterCategoria : undefined,
         tipus: filterTipus !== "all" ? (filterTipus as Transaction["tipus"]) : undefined,
         limit: 9999,
         offset: 0,
       })
 
-      let filtered = filterEsdeveniment !== "all"
-        ? data.filter((t) => t.esdeveniment_id === filterEsdeveniment)
+      let filtered = filterCompte === "__pagat_per_altri__"
+        ? data.filter((t) => !t.compte_id)
         : data
+
+      filtered = filterEsdeveniment !== "all"
+        ? filtered.filter((t) => t.esdeveniment_id === filterEsdeveniment)
+        : filtered
 
       filtered = search.trim()
         ? filtered.filter((t) => t.concepte.toLowerCase().includes(search.toLowerCase()))
@@ -137,11 +144,17 @@ export default function TransaccionsPage() {
     setShowModal(true)
   }
 
-  const handleDelete = async (tx: TransactionWithRelations) => {
+  const handleDelete = (tx: TransactionWithRelations) => {
     if (!userId) return
-    if (!confirm(`Eliminar "${tx.concepte}"?`)) return
-    await deleteTransaction(tx.id, userId)
-    loadTransactions()
+    setConfirmDialog({
+      open: true,
+      title: `Eliminar "${tx.concepte}"?`,
+      action: async () => {
+        setConfirmDialog(d => ({ ...d, open: false }))
+        await deleteTransaction(tx.id, userId)
+        loadTransactions()
+      },
+    })
   }
 
   const openNewModal = () => {
@@ -197,6 +210,9 @@ export default function TransaccionsPage() {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Tots els comptes</SelectItem>
+          <SelectItem value="__pagat_per_altri__">
+            <span className="flex items-center gap-2"><Users className="w-3.5 h-3.5 text-violet-500" />Pagat per algú</span>
+          </SelectItem>
           {accounts.map((acc) => (
             <SelectItem key={acc.id} value={acc.id}>
               <div className="flex items-center gap-2">
@@ -291,6 +307,9 @@ export default function TransaccionsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tots els comptes</SelectItem>
+                <SelectItem value="__pagat_per_altri__">
+                  <span className="flex items-center gap-2"><Users className="w-3.5 h-3.5 text-violet-500" />Pagat per algú</span>
+                </SelectItem>
                 {accounts.map((acc) => (
                   <SelectItem key={acc.id} value={acc.id}>
                     <div className="flex items-center gap-2">
@@ -421,6 +440,14 @@ export default function TransaccionsPage() {
         categories={categories}
         people={people}
         events={events}
+      />
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        confirmText="Eliminar"
+        onConfirm={confirmDialog.action}
+        onCancel={() => setConfirmDialog(d => ({ ...d, open: false }))}
       />
 
     </div>

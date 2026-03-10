@@ -13,7 +13,11 @@ export async function getPeople(userId: string): Promise<(Person & { balance: nu
             (
               COALESCE((SELECT SUM(s.import_degut) FROM transaction_splits s WHERE s.persona_id = p.id AND s.eliminat = false), 0)
               - 
-              COALESCE((SELECT SUM(t.import_trs) FROM transactions t WHERE t.liquidacio_persona_id = p.id AND t.eliminat = false), 0)
+              COALESCE((SELECT SUM(t.import_trs) FROM transactions t WHERE t.liquidacio_persona_id = p.id AND t.tipus = 'ingres' AND t.eliminat = false), 0)
+              -
+              COALESCE((SELECT SUM(t.import_trs) FROM transactions t WHERE t.pagat_per_id = p.id AND t.eliminat = false), 0)
+              +
+              COALESCE((SELECT SUM(t.import_trs) FROM transactions t WHERE t.liquidacio_persona_id = p.id AND t.tipus = 'despesa' AND t.eliminat = false), 0)
             ) as balance
           FROM people p
           WHERE p.user_id = ? AND p.eliminat = false
@@ -53,7 +57,7 @@ export interface PersonHistoryItem {
   data: number
   concepte: string
   import: number
-  tipus: 'deute' | 'liquidacio'
+  tipus: 'deute' | 'liquidacio' | 'pagat_per_altri' | 'pagat_a'
 }
 
 export async function getPersonHistory(personaId: string, userId: string): Promise<PersonHistoryItem[]> {
@@ -70,11 +74,23 @@ export async function getPersonHistory(personaId: string, userId: string): Promi
       
       SELECT id, data, concepte, import_trs as import, 'liquidacio' as tipus
       FROM transactions
-      WHERE liquidacio_persona_id = ? AND eliminat = false AND user_id = ?
+      WHERE liquidacio_persona_id = ? AND eliminat = false AND user_id = ? AND tipus = 'ingres'
+
+      UNION ALL
+
+      SELECT id, data, concepte, import_trs as import, 'pagat_per_altri' as tipus
+      FROM transactions
+      WHERE pagat_per_id = ? AND eliminat = false AND user_id = ?
+
+      UNION ALL
+
+      SELECT id, data, concepte, import_trs as import, 'pagat_a' as tipus
+      FROM transactions
+      WHERE liquidacio_persona_id = ? AND eliminat = false AND user_id = ? AND tipus = 'despesa'
       
       ORDER BY data DESC
     `,
-    args: [personaId, userId, personaId, userId],
+    args: [personaId, userId, personaId, userId, personaId, userId, personaId, userId],
   })
   
   return result.rows as unknown as PersonHistoryItem[]

@@ -22,7 +22,7 @@ export interface TransactionData {
   data: number
   import_trs: number
   notes?: string | null
-  compte_id: string
+  compte_id?: string | null
   compte_desti_id?: string | null
   categoria_id?: string | null
   esdeveniment_id?: string | null
@@ -30,6 +30,7 @@ export interface TransactionData {
   tipus: Transaction["tipus"]
   recurrent?: boolean
   liquidacio_persona_id?: string | null
+  pagat_per_id?: string | null
   deutes?: { persona_id: string; import_degut: number }[]
 }
 
@@ -84,6 +85,7 @@ export async function getTransactions(
             e.nom as esdeveniment_nom,
             et.nom as event_tag_nom,
             p.nom as persona_nom,
+            pp.nom as pagat_per_nom,
             (SELECT COALESCE(SUM(import_degut), 0) FROM transaction_splits WHERE transaccio_id = t.id AND eliminat = false) as total_deutes
           FROM transactions t
           LEFT JOIN accounts a ON t.compte_id = a.id
@@ -92,6 +94,7 @@ export async function getTransactions(
           LEFT JOIN events e ON t.esdeveniment_id = e.id
           LEFT JOIN event_tags et ON t.event_tag_id = et.id
           LEFT JOIN people p ON t.liquidacio_persona_id = p.id
+          LEFT JOIN people pp ON t.pagat_per_id = pp.id
           WHERE ${whereClause}
           ORDER BY t.data DESC, t.data_modificacio DESC
           LIMIT ? OFFSET ?`,
@@ -137,11 +140,12 @@ async function recalculateAccountBalance(
 
 async function updateAccountBalances(
   tx: any,
-  compteId: string,
+  compteId: string | null,
   compteDesti: string | null,
   userId: string
 ): Promise<void> {
-  const accountsToUpdate = new Set<string>([compteId])
+  const accountsToUpdate = new Set<string>()
+  if (compteId) accountsToUpdate.add(compteId)
   if (compteDesti) accountsToUpdate.add(compteDesti)
 
   for (const accountId of accountsToUpdate) {
@@ -168,14 +172,14 @@ export async function createTransaction(
       sql: `INSERT INTO transactions
               (id, user_id, concepte, data, import_trs, notes, compte_id, compte_desti_id,
                categoria_id, esdeveniment_id, event_tag_id, tipus, recurrent,
-               liquidacio_persona_id, data_modificacio, eliminat)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false)`,
+               liquidacio_persona_id, pagat_per_id, data_modificacio, eliminat)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false)`,
       args: [
         id, userId, data.concepte, data.data, data.import_trs,
         data.notes ?? null, data.compte_id, data.compte_desti_id ?? null,
         data.categoria_id ?? null, data.esdeveniment_id ?? null,
         data.event_tag_id ?? null, data.tipus, data.recurrent ? 1 : 0,
-        data.liquidacio_persona_id ?? null, ts,
+        data.liquidacio_persona_id ?? null, data.pagat_per_id ?? null, ts,
       ],
     })
 
@@ -191,7 +195,7 @@ export async function createTransaction(
       }
     }
 
-    await updateAccountBalances(tx, data.compte_id, data.compte_desti_id ?? null, userId)
+    await updateAccountBalances(tx, data.compte_id ?? null, data.compte_desti_id ?? null, userId)
 
     await tx.commit() 
     const { deutes, ...txData } = data
@@ -202,7 +206,7 @@ export async function createTransaction(
       data: txData.data,
       import_trs: txData.import_trs,
       notes: txData.notes ?? null,
-      compte_id: txData.compte_id,
+      compte_id: txData.compte_id ?? null,
       compte_desti_id: txData.compte_desti_id ?? null,
       categoria_id: txData.categoria_id ?? null,
       esdeveniment_id: txData.esdeveniment_id ?? null,
@@ -210,6 +214,7 @@ export async function createTransaction(
       tipus: txData.tipus,
       recurrent: txData.recurrent ?? false,
       liquidacio_persona_id: txData.liquidacio_persona_id ?? null,
+      pagat_per_id: txData.pagat_per_id ?? null,
       data_modificacio: ts,
       eliminat: false,
     }
@@ -251,6 +256,7 @@ export async function updateTransaction(
                 event_tag_id = ?,
                 tipus = COALESCE(?, tipus),
                 recurrent = COALESCE(?, recurrent),
+                pagat_per_id = ?,
                 data_modificacio = ?
             WHERE id = ? AND user_id = ? AND eliminat = false`,
       args: [
@@ -258,6 +264,7 @@ export async function updateTransaction(
         data.notes ?? null, data.compte_id ?? null, data.compte_desti_id ?? null,
         data.categoria_id ?? null, data.esdeveniment_id ?? null, data.event_tag_id ?? null,
         data.tipus ?? null, data.recurrent !== undefined ? (data.recurrent ? 1 : 0) : null,
+        data.pagat_per_id !== undefined ? (data.pagat_per_id ?? null) : null,
         ts, id, userId,
       ],
     })

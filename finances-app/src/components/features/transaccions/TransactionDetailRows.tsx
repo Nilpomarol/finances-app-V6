@@ -37,12 +37,21 @@ export function TransactionDetailRows({ tx }: TransactionDetailRowsProps) {
         </DetailRow>
       ) : (
         <DetailRow icon={Wallet} label="Compte">
-          <span className="flex items-center gap-1.5 justify-end">
-            {tx.compte_color && (
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tx.compte_color }} />
-            )}
-            {tx.compte_nom ?? "—"}
-          </span>
+          {tx.compte_nom ? (
+            <span className="flex items-center gap-1.5 justify-end">
+              {tx.compte_color && (
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tx.compte_color }} />
+              )}
+              {tx.compte_nom}
+            </span>
+          ) : tx.pagat_per_nom ? (
+            <span className="flex items-center gap-1.5 justify-end">
+              <Users className="w-3.5 h-3.5 text-violet-400 dark:text-violet-500 shrink-0" />
+              <span className="italic">{tx.pagat_per_nom}</span>
+            </span>
+          ) : (
+            <span>—</span>
+          )}
         </DetailRow>
       )}
 

@@ -17,6 +17,7 @@ import {
   RefreshCw, Repeat, Info, CheckCircle2, Shield
 } from "lucide-react"
 import { formatEuros, formatDate } from "@/lib/utils"
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 
 export default function ConfiguracioPage() {
   const { userId } = useAuthStore()
@@ -36,6 +37,7 @@ export default function ConfiguracioPage() {
   const [newKeyword, setNewKeyword] = useState("")
   const [newCategoryId, setNewCategoryId] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; action: () => void }>({ open: false, title: "", action: () => {} })
 
   const loadData = async () => {
     if (!userId) return
@@ -122,14 +124,21 @@ export default function ConfiguracioPage() {
   }
 
   const handleDeleteRule = async (id: string) => {
-    if (!userId || !confirm("Segur que vols eliminar aquesta regla?")) return
-    try {
-      await deleteRule(id, userId)
-      toast({ title: "Regla eliminada" })
-      loadData()
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error al eliminar" })
-    }
+    if (!userId) return
+    setConfirmDialog({
+      open: true,
+      title: "Eliminar aquesta regla?",
+      action: async () => {
+        setConfirmDialog(d => ({ ...d, open: false }))
+        try {
+          await deleteRule(id, userId)
+          toast({ title: "Regla eliminada" })
+          loadData()
+        } catch (error) {
+          toast({ variant: "destructive", title: "Error al eliminar" })
+        }
+      },
+    })
   }
 
   if (isLoading) {
@@ -284,7 +293,7 @@ export default function ConfiguracioPage() {
                     <div className="min-w-0 pr-4">
                       <p className="text-sm font-medium truncate">{tx.concepte}</p>
                       <p className="text-xs text-muted-foreground">
-                        {formatDate(tx.data)} • {tx.compte_nom} • {tx.categoria_nom || 'Sense cat.'}
+                        {formatDate(tx.data)} • {tx.compte_nom ?? (tx.pagat_per_nom ? `Pagat per ${tx.pagat_per_nom}` : '—')} • {tx.categoria_nom || 'Sense cat.'}
                       </p>
                     </div>
                     <span className={`text-sm font-semibold tabular-nums shrink-0 ${
@@ -404,6 +413,14 @@ export default function ConfiguracioPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        confirmText="Eliminar"
+        onConfirm={confirmDialog.action}
+        onCancel={() => setConfirmDialog(d => ({ ...d, open: false }))}
+      />
     </div>
   )
 }

@@ -9,7 +9,16 @@ export async function getEvents(userId: string): Promise<(Event & { total_despes
   const result = await db.execute({
     sql: `SELECT 
             e.*,
-            COALESCE((SELECT SUM(t.import_trs) FROM transactions t WHERE t.esdeveniment_id = e.id AND t.tipus = 'despesa' AND t.eliminat = 0), 0) as total_despesa
+            COALESCE((
+              SELECT SUM(
+                t.import_trs - COALESCE(
+                  (SELECT SUM(ts.import_degut) FROM transaction_splits ts WHERE ts.transaccio_id = t.id AND ts.eliminat = false),
+                  0
+                )
+              )
+              FROM transactions t
+              WHERE t.esdeveniment_id = e.id AND t.tipus = 'despesa' AND t.eliminat = 0
+            ), 0) as total_despesa
           FROM events e
           WHERE e.user_id = ? AND e.eliminat = 0 
           ORDER BY e.data_inici DESC`,
@@ -64,19 +73,26 @@ export async function getTransactionsByEvent(eventId: string, userId: string): P
   const db = getDb()
   // Fem JOIN amb les categories i els tags per tenir els noms i colors a la UI
   const result = await db.execute({
-    sql: `SELECT 
+    sql: `SELECT
             t.*,
+            a.nom as compte_nom,
+            a.color as compte_color,
+            ad.nom as compte_desti_nom,
             c.nom as categoria_nom,
             c.color as categoria_color,
+            c.icona as categoria_icona,
             et.nom as event_tag_nom,
-            et.color as event_tag_color
+            et.color as event_tag_color,
+            (SELECT COALESCE(SUM(import_degut), 0) FROM transaction_splits WHERE transaccio_id = t.id AND eliminat = false) as total_deutes
           FROM transactions t
+          LEFT JOIN accounts a ON t.compte_id = a.id
+          LEFT JOIN accounts ad ON t.compte_desti_id = ad.id
           LEFT JOIN categories c ON t.categoria_id = c.id
           LEFT JOIN event_tags et ON t.event_tag_id = et.id
           WHERE t.esdeveniment_id = ? AND t.user_id = ? AND t.eliminat = 0
           ORDER BY t.data DESC`,
     args: [eventId, userId]
   })
-  
+
   return result.rows as unknown as TransactionWithRelations[]
 }

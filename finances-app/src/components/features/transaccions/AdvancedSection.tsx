@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useFormContext } from "react-hook-form"
 import { FormControl, FormField, FormItem } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronDown, ChevronUp, RefreshCw } from "lucide-react"
+import { ChevronDown, ChevronUp, RefreshCw, UserCheck } from "lucide-react"
 import { ColorDot } from "@/components/shared/ColorDot"
 import { cn } from "@/lib/utils"
 import { Section, FieldLabel, Divider } from "./shared/FormPrimitives"
@@ -12,11 +12,14 @@ interface AdvancedSectionProps {
   events: { id: string; nom: string; tipus: string }[]
   availableTags: EventTag[]
   currentEventId: string | null | undefined
+  defaultOpen?: boolean
+  people?: { id: string; nom: string }[]
+  currentTipus?: "ingres" | "despesa" | "transferencia"
 }
 
-export function AdvancedSection({ events, availableTags, currentEventId }: AdvancedSectionProps) {
+export function AdvancedSection({ events, availableTags, currentEventId, defaultOpen = false, people = [], currentTipus }: AdvancedSectionProps) {
   const form = useFormContext()
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(defaultOpen)
 
   return (
     <div>
@@ -124,6 +127,35 @@ export function AdvancedSection({ events, availableTags, currentEventId }: Advan
               </button>
             </div>
           )} />
+
+          {/* Pagat per algú altre — only for expenses */}
+          {currentTipus === "despesa" && people.length > 0 && (
+            <>
+              <Divider />
+              <FormField control={form.control} name="pagat_per_id" render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-3.5 h-3.5 text-violet-500" />
+                    <FieldLabel>Pagat per algú altre</FieldLabel>
+                  </div>
+                  <Select onValueChange={field.onChange} value={field.value || "none"}>
+                    <FormControl>
+                      <SelectTrigger className="border-0 bg-transparent shadow-none p-0 h-auto text-sm font-medium focus:ring-0 [&>svg]:ml-1">
+                        <SelectValue placeholder="Ho he pagat jo..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Ho he pagat jo</SelectItem>
+                      {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.nom}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                    No afectarà el saldo del teu compte. Quedarà com a deute teu.
+                  </p>
+                </FormItem>
+              )} />
+            </>
+          )}
         </Section>
       )}
     </div>

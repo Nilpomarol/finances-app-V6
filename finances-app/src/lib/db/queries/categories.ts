@@ -90,26 +90,35 @@ export async function getCategoryById(
   return result.rows[0] as unknown as Category
 }
 
-/** Retorna el resum de despesa del mes actual per categoria */
+/** Retorna el resum de despesa del mes actual i any actual per categoria */
 export async function getCategorySummaryCurrentMonth(
   userId: string
-): Promise<Array<{ categoria_id: string; total: number }>> {
+): Promise<Array<{ categoria_id: string; total: number; total_any: number; count_any: number }>> {
   const db = getDb()
-  const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime()
+  const n = new Date()
+  const monthStart = new Date(n.getFullYear(), n.getMonth(), 1).getTime()
+  const monthEnd = new Date(n.getFullYear(), n.getMonth() + 1, 0, 23, 59, 59, 999).getTime()
+  const yearStart = new Date(n.getFullYear(), 0, 1).getTime()
+  const yearEnd = new Date(n.getFullYear(), 11, 31, 23, 59, 59, 999).getTime()
 
   const result = await db.execute({
-    sql: `SELECT categoria_id, SUM(import_trs) as total
-          FROM transactions
-          WHERE user_id = ?
-            AND eliminat = false
-            AND tipus = 'despesa'
-            AND liquidacio_persona_id IS NULL
-            AND data >= ? AND data <= ?
-            AND categoria_id IS NOT NULL
-          GROUP BY categoria_id`,
-    args: [userId, start, end],
+    sql: `SELECT
+            t.categoria_id,
+            SUM(CASE WHEN t.data >= ? AND t.data <= ?
+              THEN t.import_trs - COALESCE((SELECT SUM(s.import_degut) FROM transaction_splits s WHERE s.transaccio_id = t.id AND s.eliminat = false), 0)
+              ELSE 0 END) as total,
+            SUM(t.import_trs - COALESCE((SELECT SUM(s.import_degut) FROM transaction_splits s WHERE s.transaccio_id = t.id AND s.eliminat = false), 0)) as total_any,
+            COUNT(*) as count_any,
+            SUM(CASE WHEN t.data >= ? AND t.data <= ? THEN 1 ELSE 0 END) as count_mes
+          FROM transactions t
+          WHERE t.user_id = ?
+            AND t.eliminat = false
+            AND t.tipus = 'despesa'
+            AND t.liquidacio_persona_id IS NULL
+            AND t.data >= ? AND t.data <= ?
+            AND t.categoria_id IS NOT NULL
+          GROUP BY t.categoria_id`,
+    args: [monthStart, monthEnd, monthStart, monthEnd, userId, yearStart, yearEnd],
   })
-  return result.rows as unknown as Array<{ categoria_id: string; total: number }>
+  return result.rows as unknown as Array<{ categoria_id: string; total: number; total_any: number; count_any: number; count_mes: number }>
 }

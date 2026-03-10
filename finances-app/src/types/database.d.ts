@@ -74,7 +74,7 @@ export interface Transaction {
   data: number
   import_trs: number
   notes: string | null
-  compte_id: string
+  compte_id: string | null
   compte_desti_id: string | null
   categoria_id: string | null
   esdeveniment_id: string | null
@@ -82,6 +82,7 @@ export interface Transaction {
   tipus: "ingres" | "despesa" | "transferencia"
   recurrent: boolean
   liquidacio_persona_id: string | null
+  pagat_per_id: string | null
   data_modificacio: number
   eliminat: boolean
 }
@@ -119,7 +120,8 @@ export interface TransactionWithRelations extends Transaction {
   esdeveniment_nom?: string
   event_tag_nom?: string
   event_tag_color?: string
-  persona_nom?: string 
+  persona_nom?: string
+  pagat_per_nom?: string | null
   total_deutes?: number
 }
 

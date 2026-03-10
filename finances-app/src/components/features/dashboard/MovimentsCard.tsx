@@ -68,9 +68,15 @@ export function MovimentsCard({ transactions, onTransactionClick, className }: M
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm text-slate-900 dark:text-white truncate leading-tight">{tx.concepte}</p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                    <Wallet className="w-3 h-3" />{tx.compte_nom}
-                  </span>
+                  {tx.compte_nom ? (
+                    <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                      <Wallet className="w-3 h-3" />{tx.compte_nom}
+                    </span>
+                  ) : tx.pagat_per_nom ? (
+                    <span className="text-xs text-slate-400 flex items-center gap-1.5 italic">
+                      <Users className="w-3 h-3" />{tx.pagat_per_nom}
+                    </span>
+                  ) : null}
                   {tx.categoria_nom && (
                     <span
                       className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-0.5 border"
