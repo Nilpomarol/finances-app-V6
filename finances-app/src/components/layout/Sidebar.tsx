@@ -1,5 +1,4 @@
 import { NavLink } from "react-router-dom"
-import { useAuthStore } from "@/store/authStore"
 import { useThemeStore } from "@/store/themeStore"
 import {
   LayoutDashboard,
@@ -10,7 +9,6 @@ import {
   Users,
   CalendarDays,
   Settings,
-  LogOut,
   Plus,
   Sun,
   Moon,
@@ -92,7 +90,6 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ onNewTransaction }: SidebarProps) {
-  const { logout } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
 
   return (
@@ -172,16 +169,6 @@ export default function Sidebar({ onNewTransaction }: SidebarProps) {
               : <Moon className="w-4 h-4 shrink-0" />}
           </span>
           {theme === "dark" ? "Mode clar" : "Mode fosc"}
-        </button>
-
-        <button
-          onClick={logout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-all"
-        >
-          <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-muted/80 shrink-0">
-            <LogOut className="w-4 h-4 shrink-0" />
-          </span>
-          Tancar sessió
         </button>
       </div>
     </aside>

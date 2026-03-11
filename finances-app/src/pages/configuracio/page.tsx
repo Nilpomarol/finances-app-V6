@@ -16,7 +16,7 @@ import { PageHeader } from "@/components/shared/PageHeader"
 import { cn } from "@/lib/utils"
 import {
   Trash2, Plus, Sparkles, Download, Loader2, ArrowRight,
-  RefreshCw, Repeat, Info, CheckCircle2, Shield, Search, Sun, Moon
+  RefreshCw, Repeat, Info, CheckCircle2, Shield, Search, Sun, Moon, LogOut
 } from "lucide-react"
 import { formatEuros, formatDate } from "@/lib/utils"
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
@@ -106,7 +106,7 @@ function detectRuleSuggestions(txs: TransactionWithRelations[], existingRules: A
 }
 
 export default function ConfiguracioPage() {
-  const { userId } = useAuthStore()
+  const { userId, logout } = useAuthStore()
   const { toast } = useToast()
   const { theme, toggleTheme } = useThemeStore()
 
@@ -121,7 +121,7 @@ export default function ConfiguracioPage() {
   const [newKeyword, setNewKeyword] = useState("")
   const [newCategoryId, setNewCategoryId] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; action: () => void }>({ open: false, title: "", action: () => {} })
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; description?: string; confirmText?: string; action: () => void }>({ open: false, title: "", action: () => {} })
 
   const [isDetecting, setIsDetecting] = useState(false)
   const [candidates, setCandidates] = useState<RecurrentCandidate[] | null>(null)
@@ -338,13 +338,13 @@ export default function ConfiguracioPage() {
         </p>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map(i => (
               <div key={i} className="animate-pulse rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900 h-44" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
 
             {/* MODE FOSC */}
             <div className={card}>
@@ -443,6 +443,39 @@ export default function ConfiguracioPage() {
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Comprovar actualitzacions
+                </Button>
+              </div>
+            </div>
+
+            {/* TANCAR SESSIÓ */}
+            <div className={card}>
+              <div className="p-5 flex flex-col gap-4 h-full">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center shrink-0">
+                  <LogOut className="w-5 h-5 text-rose-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Tancar Sessió</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
+                    Tanca la sessió actual i torna a la pantalla d'accés.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setConfirmDialog({
+                    open: true,
+                    title: "Tancar la sessió?",
+                    description: "Es tancarà la sessió actual i hauràs d'introduir la contrasenya familiar i el PIN per tornar a accedir.",
+                    confirmText: "Tancar sessió",
+                    action: () => {
+                      setConfirmDialog(d => ({ ...d, open: false }))
+                      logout()
+                    },
+                  })}
+                  size="sm"
+                  variant="outline"
+                  className="w-full text-rose-500 border-rose-200 hover:bg-rose-50 dark:border-rose-500/30 dark:hover:bg-rose-500/10"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Tancar sessió
                 </Button>
               </div>
             </div>
@@ -871,7 +904,8 @@ export default function ConfiguracioPage() {
       <ConfirmDialog
         open={confirmDialog.open}
         title={confirmDialog.title}
-        confirmText="Eliminar"
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText ?? "Eliminar"}
         onConfirm={confirmDialog.action}
         onCancel={() => setConfirmDialog(d => ({ ...d, open: false }))}
       />
