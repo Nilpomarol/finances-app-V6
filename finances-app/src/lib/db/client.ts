@@ -14,12 +14,9 @@ export async function initializeDb(token: string, url?: string): Promise<Client>
   _client = createClient({
     url: dbUrl,
     authToken: token,
-    syncUrl: dbUrl,
-    syncInterval: 60,
   })
 
-  await _client.sync()
-  console.log("[DB] Client inicialitzat i sincronitzat correctament")
+  console.log("[DB] Client inicialitzat correctament")
   return _client
 }
 
@@ -31,9 +28,7 @@ export function getDb(): Client {
 }
 
 export async function syncDb(): Promise<void> {
-  if (!_client) return
-  await _client.sync()
-  console.log("[DB] Sincronització manual completada")
+  // No-op: the web client connects directly to the remote DB on every query
 }
 
 export function closeDb(): void {

@@ -63,36 +63,31 @@ export const useAuthStore = create<AuthState>((set) => ({
   error: null,
 
   tryAutoLogin: async () => {
-  const savedPassword = localStorage.getItem(STORAGE_PASSWORD_KEY)
-  const savedUserId = localStorage.getItem(STORAGE_USER_ID_KEY)
+    const savedPassword = localStorage.getItem(STORAGE_PASSWORD_KEY)
+    const savedUserId = localStorage.getItem(STORAGE_USER_ID_KEY)
 
-  if (!savedPassword || !savedUserId) return false
+    if (!savedPassword || !savedUserId) return false
 
-  set({ isLoading: true, error: null })
-  try {
-    const { token, url } = await fetchToken(savedPassword)
-    await initializeDb(token, url)
-    set({ token, isDbReady: true, userId: savedUserId, isLoading: false })
-    return true
-  } catch (err) {
-    // Si és l'error de sync en HTTP (dev local), no netegem localStorage
-    const isSyncError = err instanceof Error && 
-      err.message.includes("SYNC_NOT_SUPPORTED")
-    
-    if (isSyncError) {
-      // La BD funciona, només no pot sincronitzar en HTTP
+    set({ isLoading: true, error: null })
+    try {
+      const { token, url } = await fetchToken(savedPassword)
+      await initializeDb(token, url)
+      set({ token, isDbReady: true, userId: savedUserId, isLoading: false })
+      return true
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ""
+      const isAuthError = message.includes("incorrecta") || message.includes("incorrecte")
+
+      if (isAuthError) {
+        // Contrasenya invàlida → neteja sessió
+        localStorage.removeItem(STORAGE_PASSWORD_KEY)
+        localStorage.removeItem(STORAGE_USER_ID_KEY)
+      }
+      // Errors de xarxa o de servidor → mantenim les credencials per reintentar
       set({ isLoading: false })
-      // Intentem igualment — la BD local té les dades
       return false
     }
-
-    // Error real → neteja sessió
-    localStorage.removeItem(STORAGE_PASSWORD_KEY)
-    localStorage.removeItem(STORAGE_USER_ID_KEY)
-    set({ isLoading: false })
-    return false
-  }
-},
+  },
 
   loginWithPassword: async (password: string) => {
     set({ isLoading: true, error: null })
