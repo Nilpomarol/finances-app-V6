@@ -2,7 +2,6 @@ import { useFormContext } from "react-hook-form"
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Section, FieldLabel } from "./shared/FormPrimitives"
-import { cn } from "@/lib/utils"
 
 interface AccountSectionProps {
   accounts: { id: string; nom: string; color?: string }[]

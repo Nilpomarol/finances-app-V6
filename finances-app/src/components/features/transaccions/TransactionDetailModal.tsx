@@ -52,7 +52,7 @@ export default function TransactionDetailModal({
             variant="outline"
             size="sm"
             className="h-10 text-rose-500 border-rose-200 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 dark:border-rose-900 dark:hover:bg-rose-900/20 font-medium rounded-xl transition-all"
-            onClick={() => { onClose(); onDelete(tx) }}
+            onClick={() => onDelete(tx)}
           >
             <Trash2 className="w-3.5 h-3.5 mr-1.5" />
             Eliminar

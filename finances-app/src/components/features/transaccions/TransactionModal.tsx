@@ -152,7 +152,7 @@ export default function TransactionModal({
         concepte: transactionToEdit.concepte,
         import_trs: transactionToEdit.import_trs,
         data: transactionToEdit.data,
-        compte_id: transactionToEdit.compte_id,
+        compte_id: transactionToEdit.compte_id ?? undefined,
         compte_desti_id: transactionToEdit.compte_desti_id || "",
         categoria_id: transactionToEdit.categoria_id || "",
         esdeveniment_id: transactionToEdit.esdeveniment_id || null,

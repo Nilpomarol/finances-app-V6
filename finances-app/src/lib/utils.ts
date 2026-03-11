@@ -33,6 +33,14 @@ export function formatDate(timestamp: number): string {
   }).format(new Date(timestamp))
 }
 
+/** Genera un color HSL determinista a partir d'un ID d'esdeveniment */
+export function eventColor(id: string): string {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) & 0xffffffff
+  const hue = Math.abs(hash) % 360
+  return `hsl(${hue}, 60%, 50%)`
+}
+
 /** Retorna l'inici i fi del mes actual com a timestamps */
 export function getCurrentMonthRange(): { start: number; end: number } {
   const now = new Date()

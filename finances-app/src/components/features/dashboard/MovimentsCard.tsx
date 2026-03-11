@@ -121,7 +121,7 @@ export function MovimentsCard({ transactions, onTransactionClick, className }: M
                   <span className={cn(
                     "font-bold text-sm tabular-nums",
                     tx.tipus === "ingres" ? "text-emerald-600" :
-                    tx.tipus === "despesa" ? "text-slate-700 dark:text-slate-300" : "text-sky-600"
+                    tx.tipus === "despesa" ? "text-rose-500" : "text-sky-600"
                   )}>
                     {tx.tipus === "ingres" ? "+" : tx.tipus === "despesa" ? "−" : ""}
                     {formatEuros(tx.import_trs)}

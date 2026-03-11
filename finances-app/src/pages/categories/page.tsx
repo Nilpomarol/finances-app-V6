@@ -7,6 +7,7 @@ import CategoryModal from "@/components/features/categories/CategoryModal"
 import DynamicIcon from "@/components/shared/DynamicIcon"
 import { Button } from "@/components/ui/button"
 import { Plus, Tag, TrendingDown, TrendingUp, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { EmptyState } from "@/components/shared/EmptyState"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
@@ -151,27 +152,23 @@ export default function CategoriesPage() {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[88px] rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+            <div key={i} className="h-[88px] rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-slate-100 dark:bg-slate-800 animate-pulse" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mb-4">
-            <Tag className="w-6 h-6 text-slate-400" />
-          </div>
-          <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
-            Cap categoria de {activeTab === "despesa" ? "despeses" : "ingressos"}
-          </p>
-          <p className="text-xs text-slate-400 mt-1 mb-5">
-            Crea categories per organitzar les teves transaccions
-          </p>
-          <Button
-            onClick={() => { setEditingCategory(undefined); setShowModal(true) }}
-            className="h-9 px-4 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-semibold text-sm"
-          >
-            <Plus className="w-4 h-4 mr-1.5" /> Crear categoria
-          </Button>
-        </div>
+        <EmptyState
+          icon={<Tag className="w-6 h-6" />}
+          title={`Cap categoria de ${activeTab === "despesa" ? "despeses" : "ingressos"}`}
+          description="Crea categories per organitzar les teves transaccions"
+          action={
+            <Button
+              onClick={() => { setEditingCategory(undefined); setShowModal(true) }}
+              className="bg-rose-500 hover:bg-rose-600 text-white"
+            >
+              <Plus className="w-4 h-4 mr-1.5" /> Crear categoria
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {filtered.map((cat) => {

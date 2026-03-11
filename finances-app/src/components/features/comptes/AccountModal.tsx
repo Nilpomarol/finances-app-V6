@@ -282,7 +282,7 @@ export default function AccountModal({
               <Button
                 type="submit"
                 disabled={form.formState.isSubmitting}
-                className="w-full h-12 text-base font-semibold rounded-xl bg-[#ef4444] hover:bg-[#dc2626] text-white"
+                className="w-full h-12 text-base font-semibold rounded-xl bg-red-500 hover:bg-red-600 text-white"
               >
                 {form.formState.isSubmitting && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

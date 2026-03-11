@@ -268,7 +268,7 @@ function TransactionRow({
               <MoreVertical className="w-3.5 h-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             {onEdit && (
               <DropdownMenuItem onClick={() => onEdit(tx)}>
                 <Pencil className="w-3.5 h-3.5 mr-2" />

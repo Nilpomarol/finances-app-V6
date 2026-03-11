@@ -13,8 +13,8 @@ interface KpiCardProps {
 export function KpiCard({ title, value, icon, trend, iconBg, className }: KpiCardProps) {
   return (
     <div className={cn(
-      "rounded-2xl border border-slate-200 bg-white p-5 flex flex-col gap-4",
-      "shadow-[0_1px_4px_rgba(15,23,42,0.05),0_4px_16px_rgba(15,23,42,0.04)]",
+      "rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900 p-5 flex flex-col gap-4",
+      "shadow-[0_1px_4px_rgba(15,23,42,0.05),0_6px_24px_rgba(15,23,42,0.06)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3),0_6px_24px_rgba(0,0,0,0.3)]",
       className
     )}>
       {/* Top row */}

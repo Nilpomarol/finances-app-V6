@@ -1,222 +1,327 @@
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { useAuthStore } from "@/store/authStore"
 import { useFilterStore } from "@/store/filterStore"
 import { getAccounts } from "@/lib/db/queries/accounts"
 import { getCategories } from "@/lib/db/queries/categories"
-import { getTransactions } from "@/lib/db/queries/transactions"
-
-
-// Importació dels components de la UI (Assegura't que existeixen)
+import { getTransactions, getDistinctPeriods } from "@/lib/db/queries/transactions"
+import { getEvents } from "@/lib/db/queries/events"
+import { eventColor } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AnalysisFilters } from "@/components/features/analisi/AnalysisFilters"
-import { AnalysisCharts } from "@/components/features/analisi/AnalysisCharts"
-import { AnalysisKPIs } from "@/components/features/analisi/AnalysisKpis"
-import { ComparisonKPIs } from "@/components/features/analisi/ComparisonKpis"
-import { RecurringAnalysis } from "@/components/features/analisi/RecurringAnalysis"
-import type { Account, Category, TransactionWithRelations } from "@/types/database"
+import { ResumTab } from "@/components/features/analisi/ResumTab"
+import { CategoriesTab } from "@/components/features/analisi/CategoriesTab"
+import { ComparativaTab } from "@/components/features/analisi/ComparativaTab"
+import { RecurrentsTab } from "@/components/features/analisi/RecurrentsTab"
+import { MobileAnalysisView } from "@/components/features/analisi/MobileAnalysisView"
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
+import type { Account, Category, Event, TransactionWithRelations } from "@/types/database"
+import type { PeriodStats } from "@/components/features/analisi/ResumTab"
+import type { CategoryComparisonItem } from "@/components/features/analisi/ComparativaTab"
 
 export default function AnalisiPage() {
   const { userId } = useAuthStore()
-  const { periode, compteIds, categoriaIds } = useFilterStore()
+  const { periode, periodeAnterior, periodeMode, compteIds, categoriaIds, evenimentIds } = useFilterStore()
 
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [events, setEvents] = useState<Event[]>([])
+  const [availablePeriods, setAvailablePeriods] = useState<{ mes: number; any: number }[]>([])
   const [transactionsActual, setTransactionsActual] = useState<TransactionWithRelations[]>([])
   const [transactionsAnterior, setTransactionsAnterior] = useState<TransactionWithRelations[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("resum")
+  const hasLoadedOnce = useRef(false)
 
+  // Fetch current period data + metadata
   useEffect(() => {
-    if (!userId || !periode) return
-    setIsLoading(true)
+    if (!userId) return
+    if (periodeMode !== "alltime" && !periode) return
+    if (!hasLoadedOnce.current) setIsLoading(true)
 
-    // Càlcul dates període actual
-    const startActual = new Date(periode.any, periode.mes - 1, 1).getTime()
-    const endActual = new Date(periode.any, periode.mes, 0, 23, 59, 59).getTime()
-
-    // Càlcul dates període anterior (Mes - 1)
-    const dataAnterior = new Date(periode.any, periode.mes - 2, 1)
-    const startAnterior = new Date(dataAnterior.getFullYear(), dataAnterior.getMonth(), 1).getTime()
-    const endAnterior = new Date(dataAnterior.getFullYear(), dataAnterior.getMonth() + 1, 0, 23, 59, 59).getTime()
+    const dateRange = periodeMode === "alltime"
+      ? {}
+      : periodeMode === "any"
+        ? {
+            dateStart: new Date(periode!.any, 0, 1).getTime(),
+            dateEnd: new Date(periode!.any, 11, 31, 23, 59, 59).getTime(),
+          }
+        : {
+            dateStart: new Date(periode!.any, periode!.mes - 1, 1).getTime(),
+            dateEnd: new Date(periode!.any, periode!.mes, 0, 23, 59, 59).getTime(),
+          }
 
     Promise.all([
       getAccounts(userId),
       getCategories(userId),
-      getTransactions({ userId, dateStart: startActual, dateEnd: endActual, excludeLiquidacions: true }),
-      getTransactions({ userId, dateStart: startAnterior, dateEnd: endAnterior, excludeLiquidacions: true })
-    ]).then(([accs, cats, txsActual, txsAnterior]) => {
+      getTransactions({ userId, ...dateRange, excludeLiquidacions: true, limit: periodeMode === "alltime" ? 999999 : undefined }),
+      getEvents(userId),
+      getDistinctPeriods(userId),
+    ]).then(([accs, cats, txs, evts, periods]) => {
       setAccounts(accs)
       setCategories(cats)
-      setTransactionsActual(txsActual)
-      setTransactionsAnterior(txsAnterior)
+      setTransactionsActual(txs)
+      setEvents(evts as unknown as Event[])
+      setAvailablePeriods(periods)
+      hasLoadedOnce.current = true
       setIsLoading(false)
     })
-  }, [userId, periode])
+  }, [userId, periode, periodeMode])
 
-  // Processament de dades per a la vista individual
-  const actualStats = useMemo(() => processTransactions(transactionsActual, periode, compteIds, categoriaIds),
-    [transactionsActual, compteIds, categoriaIds, periode])
+  // Fetch comparison period independently (re-runs whenever periodeAnterior changes)
+  useEffect(() => {
+    if (!userId || !periodeAnterior || periodeMode === "alltime") return
+    const start = periodeMode === "any"
+      ? new Date(periodeAnterior.any, 0, 1).getTime()
+      : new Date(periodeAnterior.any, periodeAnterior.mes - 1, 1).getTime()
+    const end = periodeMode === "any"
+      ? new Date(periodeAnterior.any, 11, 31, 23, 59, 59).getTime()
+      : new Date(periodeAnterior.any, periodeAnterior.mes, 0, 23, 59, 59).getTime()
 
-  // Processament de totals per a la vista comparativa
-  const anteriorTotals = useMemo(() => {
-    let ingressos = 0, despeses = 0
-    const filteredAnterior = transactionsAnterior.filter(t => {
-      const matchCompte = compteIds.length === 0 || compteIds.includes(t.compte_id)
-      const matchCat = categoriaIds.length === 0 || (t.categoria_id && categoriaIds.includes(t.categoria_id))
-      return matchCompte && matchCat
-    })
+    getTransactions({ userId, dateStart: start, dateEnd: end, excludeLiquidacions: true }).then(
+      setTransactionsAnterior,
+    )
+  }, [userId, periodeAnterior, periodeMode])
 
-    filteredAnterior.forEach(t => {
-      if (t.tipus === 'ingres') ingressos += t.import_trs
-      else if (t.tipus === 'despesa') despeses += t.import_trs - (t.total_deutes ?? 0)
-    })
-    return { ingressos, despeses }
-  }, [transactionsAnterior, compteIds, categoriaIds])
-
-  // Processament de la comparació per categories
-  const categoryComparison = useMemo(
-    () => processCategoryComparison(transactionsActual, transactionsAnterior, compteIds, categoriaIds),
-    [transactionsActual, transactionsAnterior, compteIds, categoriaIds]
+  const actualStats = useMemo(
+    () => processTransactions(transactionsActual, periode, compteIds, categoriaIds, evenimentIds, periodeMode),
+    [transactionsActual, periode, compteIds, categoriaIds, evenimentIds, periodeMode],
   )
 
-  // Processament de les dades diàries del període anterior
-  const dailyDataAnterior = useMemo(() => {
-    if (!periode) return []
-    const anteriorDate = new Date(periode.any, periode.mes - 2, 1)
-    const anteriorPeriode = {
-      any: anteriorDate.getFullYear(),
-      mes: anteriorDate.getMonth() + 1,
-    }
-    const stats = processTransactions(transactionsAnterior, anteriorPeriode, compteIds, categoriaIds)
-    return stats.dailyData
-  }, [transactionsAnterior, compteIds, categoriaIds, periode])
+  const anteriorStats = useMemo(
+    () => processTransactions(transactionsAnterior, periodeAnterior, compteIds, categoriaIds, evenimentIds, periodeMode),
+    [transactionsAnterior, periodeAnterior, compteIds, categoriaIds, evenimentIds, periodeMode],
+  )
 
-  if (isLoading) return <div className="p-8 text-center animate-pulse">Analitzant períodes...</div>
+  const categoryComparison = useMemo(
+    () => buildCategoryComparison(actualStats.categoryData, anteriorStats.categoryData),
+    [actualStats.categoryData, anteriorStats.categoryData],
+  )
+
+  const filteredActual = useMemo(() => {
+    return transactionsActual.filter(t => {
+      const matchCompte = compteIds.length === 0 || compteIds.includes(t.compte_id ?? "")
+      const matchCat =
+        categoriaIds.length === 0 ||
+        (t.categoria_id != null && categoriaIds.includes(t.categoria_id))
+      const matchEsdev =
+        evenimentIds.length === 0 ||
+        (t.esdeveniment_id != null && evenimentIds.includes(t.esdeveniment_id))
+      return matchCompte && matchCat && matchEsdev
+    })
+  }, [transactionsActual, compteIds, categoriaIds, evenimentIds])
+
+  if (isLoading) {
+    return <LoadingSpinner label="Analitzant períodes…" />
+  }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Anàlisi de Dades</h1>
+    <>
+      {/* ── Mobile view (hidden on md+) ─────────────────────────────────── */}
+      <div className="md:hidden">
+        <MobileAnalysisView
+          actualStats={actualStats}
+          anteriorStats={anteriorStats}
+          categoryComparison={categoryComparison}
+          filteredActual={filteredActual}
+          categories={categories}
+          accounts={accounts}
+          events={events}
+          availablePeriods={availablePeriods}
+          periode={periode}
+        />
+      </div>
 
-      {/* Barra de filtres global sempre visible */}
-      <AnalysisFilters accounts={accounts} categories={categories} />
+      {/* ── Desktop view (hidden on mobile) ────────────────────────────── */}
+      <div className="hidden md:block space-y-6">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+            Finances personals
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
+            Anàlisi de Dades
+          </h1>
+        </div>
 
-      {/* SISTEMA DE PESTANYES PER CANVIAR D'ANÀLISI */}
-      <Tabs defaultValue="individual" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="individual">Anàlisi Individual</TabsTrigger>
-          <TabsTrigger value="comparativa">Comparativa (Vs. Mes Anterior)</TabsTrigger>
-          <TabsTrigger value="recurrents">Despeses Recurrents</TabsTrigger>
-        </TabsList>
+        <AnalysisFilters
+          accounts={accounts}
+          categories={categories}
+          events={events}
+          availablePeriods={availablePeriods}
+        />
 
-        {/* CONTINGUT: ANÀLISI INDIVIDUAL */}
-        <TabsContent value="individual" className="space-y-6 mt-6">
-          <AnalysisKPIs
-            ingressos={actualStats.ingressos}
-            despeses={actualStats.despeses}
-            estalvi={actualStats.estalvi}
-          />
-          <AnalysisCharts
-            dailyData={actualStats.dailyData}
-            categoryData={actualStats.categoryData}
-          />
-        </TabsContent>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="resum">Resum</TabsTrigger>
+            <TabsTrigger value="categories">Categories</TabsTrigger>
+            <TabsTrigger value="comparativa">Comparativa</TabsTrigger>
+            <TabsTrigger value="recurrents">Recurrents</TabsTrigger>
+          </TabsList>
 
-        {/* CONTINGUT: ANÀLISI COMPARATIVA */}
-        <TabsContent value="comparativa" className="space-y-6 mt-6">
-          <ComparisonKPIs
-            ingressos={{ actual: actualStats.ingressos, anterior: anteriorTotals.ingressos }}
-            despeses={{ actual: actualStats.despeses, anterior: anteriorTotals.despeses }}
-            categoryComparison={categoryComparison}
-            dailyDataActual={actualStats.dailyData}
-            dailyDataAnterior={dailyDataAnterior}
-          />
-        </TabsContent>
-        <TabsContent value="recurrents" className="mt-6">
-          <RecurringAnalysis transactions={transactionsActual} />
-        </TabsContent>
-      </Tabs>
-    </div>
+          <TabsContent value="resum" className="mt-6">
+            <ResumTab stats={actualStats} categories={categories} transactions={filteredActual} />
+          </TabsContent>
+
+          <TabsContent value="categories" className="mt-6">
+            <CategoriesTab
+              categoryData={actualStats.categoryData}
+              incomeCategoryData={actualStats.incomeCategoryData}
+              totalDespeses={actualStats.despeses}
+              totalIngressos={actualStats.ingressos}
+              categories={categories}
+            />
+          </TabsContent>
+
+          <TabsContent value="comparativa" className="mt-6">
+            <ComparativaTab
+              actualStats={actualStats}
+              anteriorStats={anteriorStats}
+              categoryComparison={categoryComparison}
+              periode={periode}
+              availablePeriods={availablePeriods}
+            />
+          </TabsContent>
+
+          <TabsContent value="recurrents" className="mt-6">
+            <RecurrentsTab transactions={filteredActual} totalDespeses={actualStats.despeses} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </>
   )
 }
 
-// Funció helper per processar les transaccions
-function processTransactions(transactions: TransactionWithRelations[], periode: any, compteIds: string[], categoriaIds: string[]) {
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function emptyStats(): PeriodStats {
+  return {
+    ingressos: 0,
+    despeses: 0,
+    estalvi: 0,
+    taxaEstalvi: 0,
+    dailyData: [],
+    categoryData: [],
+    incomeCategoryData: [],
+  }
+}
+
+function processTransactions(
+  transactions: TransactionWithRelations[],
+  periode: { mes: number; any: number } | null,
+  compteIds: string[],
+  categoriaIds: string[],
+  evenimentIds: string[] = [],
+  periodeMode: "mes" | "any" | "alltime" = "mes",
+): PeriodStats {
+  if (!periode && periodeMode !== "alltime") return emptyStats()
+
   let filtered = transactions
-  if (compteIds.length > 0) filtered = filtered.filter(t => compteIds.includes(t.compte_id))
-  if (categoriaIds.length > 0) filtered = filtered.filter(t => t.categoria_id && categoriaIds.includes(t.categoria_id))
+  if (compteIds.length > 0) {
+    filtered = filtered.filter(t => compteIds.includes(t.compte_id ?? ""))
+  }
+  if (categoriaIds.length > 0) {
+    filtered = filtered.filter(
+      t => t.categoria_id != null && categoriaIds.includes(t.categoria_id),
+    )
+  }
+  if (evenimentIds.length > 0) {
+    filtered = filtered.filter(
+      t => t.esdeveniment_id != null && evenimentIds.includes(t.esdeveniment_id),
+    )
+  }
 
-  let ingressos = 0, despeses = 0
-  const dailyMap: Record<number, any> = {}
-  const categoryMap: Record<string, any> = {}
+  let ingressos = 0
+  let despeses = 0
 
-  const diesMes = new Date(periode.any, periode.mes, 0).getDate()
-  for (let i = 1; i <= diesMes; i++) dailyMap[i] = { dia: i, ingresos: 0, gastos: 0 }
+  // Build time buckets
+  const dailyMap: Record<number, { dia: number; ingressos: number; despeses: number }> = {}
+  if (periodeMode === "any") {
+    for (let i = 1; i <= 12; i++) dailyMap[i] = { dia: i, ingressos: 0, despeses: 0 }
+  } else if (periodeMode === "mes" && periode) {
+    const diesMes = new Date(periode.any, periode.mes, 0).getDate()
+    for (let i = 1; i <= diesMes; i++) dailyMap[i] = { dia: i, ingressos: 0, despeses: 0 }
+  }
+  // alltime: populated dynamically per year below
 
-  filtered.forEach(t => {
-    const dia = new Date(t.data).getDate()
-    if (t.tipus === 'ingres') {
-      ingressos += t.import_trs
-      if (dailyMap[dia]) dailyMap[dia].ingresos += t.import_trs
-    } else if (t.tipus === 'despesa') {
-      const netAmount = t.import_trs - (t.total_deutes ?? 0)
-      despeses += netAmount
-      if (dailyMap[dia]) dailyMap[dia].gastos += netAmount
+  const categoryMap: Record<string, { name: string; value: number; color: string; categoriaId: string | null; evenimentId: string | null }> = {}
+  const incomeCatMap: Record<string, { name: string; value: number; color: string; categoriaId: string | null; evenimentId: string | null }> = {}
 
-      const catName = t.categoria_nom || "Sense categoria"
-      if (!categoryMap[catName]) {
-        categoryMap[catName] = { name: catName, value: 0, color: t.categoria_color || "#ccc" }
-      }
-      categoryMap[catName].value += netAmount
+  for (const t of filtered) {
+    const txDate = new Date(t.data)
+    const dia = periodeMode === "any"
+      ? txDate.getMonth() + 1
+      : periodeMode === "alltime"
+        ? txDate.getFullYear()
+        : txDate.getDate()
+
+    if (periodeMode === "alltime" && !dailyMap[dia]) {
+      dailyMap[dia] = { dia, ingressos: 0, despeses: 0 }
     }
-  })
+
+    if (t.tipus === "ingres") {
+      ingressos += t.import_trs
+      if (dailyMap[dia]) dailyMap[dia].ingressos += t.import_trs
+
+      const isEvent = !!t.esdeveniment_id
+      const mapKey = isEvent ? `__esdev__${t.esdeveniment_id}` : (t.categoria_nom ?? "Sense categoria")
+      const groupName = isEvent ? (t.esdeveniment_nom ?? "Sense nom") : (t.categoria_nom ?? "Sense categoria")
+      if (!incomeCatMap[mapKey]) {
+        incomeCatMap[mapKey] = {
+          name: groupName,
+          value: 0,
+          color: isEvent ? eventColor(t.esdeveniment_id!) : (t.categoria_color ?? "#10b981"),
+          categoriaId: isEvent ? null : (t.categoria_id ?? null),
+          evenimentId: t.esdeveniment_id ?? null,
+        }
+      }
+      incomeCatMap[mapKey].value += t.import_trs
+    } else if (t.tipus === "despesa") {
+      const net = t.import_trs - (t.total_deutes ?? 0)
+      despeses += net
+      if (dailyMap[dia]) dailyMap[dia].despeses += net
+
+      const isEvent = !!t.esdeveniment_id
+      const mapKey = isEvent ? `__esdev__${t.esdeveniment_id}` : (t.categoria_nom ?? "Sense categoria")
+      const groupName = isEvent ? (t.esdeveniment_nom ?? "Sense nom") : (t.categoria_nom ?? "Sense categoria")
+      if (!categoryMap[mapKey]) {
+        categoryMap[mapKey] = {
+          name: groupName,
+          value: 0,
+          color: isEvent ? eventColor(t.esdeveniment_id!) : (t.categoria_color ?? "#ccc"),
+          categoriaId: isEvent ? null : (t.categoria_id ?? null),
+          evenimentId: t.esdeveniment_id ?? null,
+        }
+      }
+      categoryMap[mapKey].value += net
+    }
+  }
+
+  const estalvi = ingressos - despeses
+  const taxaEstalvi = ingressos > 0 ? (estalvi / ingressos) * 100 : 0
 
   return {
     ingressos,
     despeses,
-    estalvi: ingressos - despeses,
-    dailyData: Object.values(dailyMap),
-    categoryData: Object.values(categoryMap).sort((a, b) => b.value - a.value)
+    estalvi,
+    taxaEstalvi,
+    dailyData: Object.values(dailyMap).sort((a, b) => a.dia - b.dia),
+    categoryData: Object.values(categoryMap).sort((a, b) => b.value - a.value),
+    incomeCategoryData: Object.values(incomeCatMap).sort((a, b) => b.value - a.value),
   }
 }
 
-// Funció per construir la comparació per categories entre dos períodes
-function processCategoryComparison(
-  txActual: TransactionWithRelations[],
-  txAnterior: TransactionWithRelations[],
-  compteIds: string[],
-  categoriaIds: string[]
-) {
-  const filterTx = (transactions: TransactionWithRelations[]) => {
-    let filtered = transactions
-    if (compteIds.length > 0) filtered = filtered.filter(t => compteIds.includes(t.compte_id))
-    if (categoriaIds.length > 0) filtered = filtered.filter(t => t.categoria_id && categoriaIds.includes(t.categoria_id))
-    return filtered
+function buildCategoryComparison(
+  actual: PeriodStats["categoryData"],
+  anterior: PeriodStats["categoryData"],
+): CategoryComparisonItem[] {
+  const map: Record<string, CategoryComparisonItem> = {}
+
+  for (const c of actual) {
+    map[c.name] = { nom: c.name, color: c.color, actual: c.value, anterior: 0 }
+  }
+  for (const c of anterior) {
+    if (!map[c.name]) map[c.name] = { nom: c.name, color: c.color, actual: 0, anterior: 0 }
+    map[c.name].anterior = c.value
   }
 
-  const filteredActual = filterTx(txActual)
-  const filteredAnterior = filterTx(txAnterior)
-
-  // Mapa unificat de categories: clau = nom de la categoria
-  const categoryMap: Record<string, { nom: string; color: string; actual: number; anterior: number }> = {}
-
-  // Processar despeses del període actual
-  filteredActual.forEach(t => {
-    if (t.tipus !== 'despesa') return
-    const catName = t.categoria_nom || "Sense categoria"
-    if (!categoryMap[catName]) {
-      categoryMap[catName] = { nom: catName, color: t.categoria_color || "#ccc", actual: 0, anterior: 0 }
-    }
-    categoryMap[catName].actual += t.import_trs - (t.total_deutes ?? 0)
-  })
-
-  // Processar despeses del període anterior
-  filteredAnterior.forEach(t => {
-    if (t.tipus !== 'despesa') return
-    const catName = t.categoria_nom || "Sense categoria"
-    if (!categoryMap[catName]) {
-      categoryMap[catName] = { nom: catName, color: t.categoria_color || "#ccc", actual: 0, anterior: 0 }
-    }
-    categoryMap[catName].anterior += t.import_trs - (t.total_deutes ?? 0)
-  })
-
-  return Object.values(categoryMap)
+  return Object.values(map).sort((a, b) => b.actual - a.actual)
 }

@@ -44,11 +44,11 @@ export function CategoriesCard({
         </div>
 
         {/* Inline pill switcher */}
-        <div className="flex items-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-0.5">
+        <div className="flex items-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-0.5">
           <button
             onClick={() => setTab("despeses")}
             className={cn(
-              "px-3 py-1 rounded-md text-xs font-semibold transition-all",
+              "px-3 py-1 rounded-lg text-xs font-semibold transition-all",
               tab === "despeses"
                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
@@ -59,7 +59,7 @@ export function CategoriesCard({
           <button
             onClick={() => setTab("ingressos")}
             className={cn(
-              "px-3 py-1 rounded-md text-xs font-semibold transition-all",
+              "px-3 py-1 rounded-lg text-xs font-semibold transition-all",
               tab === "ingressos"
                 ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"

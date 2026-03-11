@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react"
-import { useNavigate, Link } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { useAuthStore } from "@/store/authStore"
 import { useThemeStore } from "@/store/themeStore"
 import { getAccounts } from "@/lib/db/queries/accounts"
@@ -10,12 +10,12 @@ import { getEventTags } from "@/lib/db/queries/event-tags"
 import { getRules } from "@/lib/db/queries/rules"
 import { getPeople } from "@/lib/db/queries/people"
 import type { Account, TransactionWithRelations, Category, Person } from "@/types/database"
-import { formatEuros } from "@/lib/utils"
+import { formatEuros, eventColor } from "@/lib/utils"
 import {
   ArrowDownRight, ArrowUpRight, Landmark, Wallet,
   Upload, Activity, Plus,
 } from "lucide-react"
-import { KpiCard } from "@/components/shared/KpiCard"
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner"
 import { Button } from "@/components/ui/button"
 import ImportCsvModal from "@/components/features/importador-csv/ImportCsvModal"
 import TransactionModal from "@/components/features/transaccions/TransactionModal"
@@ -146,20 +146,37 @@ export default function DashboardPage() {
     const catMap = new Map<string, any>()
     transactions.forEach(tx => {
       if (tx.tipus !== tipus) return
-      const catId = tx.categoria_id || "__sense__"
       const amount = tipus === "despesa" ? tx.import_trs - (tx.total_deutes ?? 0) : tx.import_trs
-      const existing = catMap.get(catId)
-      if (existing) {
-        existing.total += amount
+
+      if (tx.esdeveniment_id) {
+        const key = tx.esdeveniment_id
+        const existing = catMap.get(key)
+        if (existing) {
+          existing.total += amount
+        } else {
+          catMap.set(key, {
+            id: key,
+            nom: tx.esdeveniment_nom ?? "Sense nom",
+            color: eventColor(key),
+            total: amount,
+            pressupost_mensual: null,
+          })
+        }
       } else {
-        const cat = categories.find(c => c.id === catId)
-        catMap.set(catId, {
-          id: catId,
-          nom: cat?.nom || "Sense categoria",
-          color: cat?.color || "#94a3b8",
-          total: amount,
-          pressupost_mensual: cat?.pressupost_mensual ?? null,
-        })
+        const catId = tx.categoria_id || "__sense__"
+        const existing = catMap.get(catId)
+        if (existing) {
+          existing.total += amount
+        } else {
+          const cat = categories.find(c => c.id === catId)
+          catMap.set(catId, {
+            id: catId,
+            nom: cat?.nom || "Sense categoria",
+            color: cat?.color || "#94a3b8",
+            total: amount,
+            pressupost_mensual: cat?.pressupost_mensual ?? null,
+          })
+        }
       }
     })
     return Array.from(catMap.values()).sort((a, b) => b.total - a.total)
@@ -179,14 +196,7 @@ export default function DashboardPage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-7 h-7 border-2 border-slate-200 dark:border-slate-700 border-t-slate-500 dark:border-t-slate-400 rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Carregant resum financer…</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner label="Carregant resum financer…" />
   }
 
   const savingsRate = kpis.ingressos > 0
@@ -222,7 +232,7 @@ export default function DashboardPage() {
   const card = "rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900 shadow-[0_1px_4px_rgba(15,23,42,0.05),0_6px_24px_rgba(15,23,42,0.06)] dark:shadow-[0_1px_4px_rgba(0,0,0,0.3),0_6px_24px_rgba(0,0,0,0.3)] overflow-hidden"
 
   return (
-    <div className="space-y-10 w-full">
+    <div className="space-y-8 w-full">
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -240,7 +250,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2 shrink-0">
           <Button
             onClick={() => setShowTransactionModal(true)}
-            className="h-10 px-5 text-sm font-semibold rounded-xl"
+            className="h-10 px-5 text-sm font-semibold"
           >
             <Plus className="w-4 h-4 mr-2" />
             Nova transacció
@@ -248,7 +258,7 @@ export default function DashboardPage() {
           <Button
             onClick={() => setShowImportModal(true)}
             variant="outline"
-            className="h-10 px-5 text-sm font-semibold rounded-xl"
+            className="h-10 px-5 text-sm font-semibold"
           >
             <Upload className="w-4 h-4 mr-2 opacity-70" />
             Importar CSV

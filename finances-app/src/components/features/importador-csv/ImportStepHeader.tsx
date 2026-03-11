@@ -10,17 +10,17 @@ const STEPS = [
 
 export default function ImportStepHeader({ step, onClose }: ImportStepHeaderProps & { onClose: () => void }) {
   return (
-    <div className="bg-[#0f1628] text-white px-8 pt-5 pb-6 shrink-0">
+    <div className="bg-slate-50 dark:bg-[#0f1628] text-slate-900 dark:text-white px-8 pt-5 pb-6 shrink-0 border-b border-slate-200 dark:border-transparent">
       {/* Top row: title + close button */}
       <div className="flex items-center justify-between mb-6">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold tracking-tight text-white/70">
+          <DialogTitle className="text-base font-semibold tracking-tight text-slate-500 dark:text-white/70">
             Importar CSV
           </DialogTitle>
         </DialogHeader>
         <button
           onClick={onClose}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200 dark:text-white/40 dark:hover:text-white dark:hover:bg-white/10 transition-colors"
           aria-label="Tancar"
         >
           <X className="w-4 h-4" />
@@ -42,8 +42,8 @@ export default function ImportStepHeader({ step, onClose }: ImportStepHeaderProp
                 <div className={`
                   w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300
                   ${isActive    ? "bg-[#f43f5e] shadow-lg shadow-[#f43f5e]/40 scale-110" : ""}
-                  ${isCompleted ? "bg-white/10"  : ""}
-                  ${isDimmed    ? "bg-white/5"   : ""}
+                  ${isCompleted ? "bg-slate-200 dark:bg-white/10"  : ""}
+                  ${isDimmed    ? "bg-slate-100 dark:bg-white/5"   : ""}
                 `}>
                   {isCompleted ? (
                     /* Checkmark for completed */
@@ -51,23 +51,23 @@ export default function ImportStepHeader({ step, onClose }: ImportStepHeaderProp
                       <polyline points="20 6 9 17 4 12" className="text-[#f43f5e]" stroke="#f43f5e" />
                     </svg>
                   ) : (
-                    <s.Icon className={`w-6 h-6 transition-colors ${isActive ? "text-white" : "text-white/30"}`} />
+                    <s.Icon className={`w-6 h-6 transition-colors ${isActive ? "text-white" : "text-slate-400 dark:text-white/30"}`} />
                   )}
                 </div>
 
                 {/* Label + sub */}
                 <div className="text-center">
                   <p className={`text-sm font-semibold leading-tight transition-colors
-                    ${isActive    ? "text-white"      : ""}
-                    ${isCompleted ? "text-white/50"   : ""}
-                    ${isDimmed    ? "text-white/25"   : ""}
+                    ${isActive    ? "text-slate-900 dark:text-white"           : ""}
+                    ${isCompleted ? "text-slate-400 dark:text-white/50"        : ""}
+                    ${isDimmed    ? "text-slate-300 dark:text-white/25"        : ""}
                   `}>
                     {s.label}
                   </p>
                   <p className={`text-[11px] mt-0.5 transition-colors
-                    ${isActive    ? "text-white/55"   : ""}
-                    ${isCompleted ? "text-white/30"   : ""}
-                    ${isDimmed    ? "text-white/15"   : ""}
+                    ${isActive    ? "text-slate-500 dark:text-white/55"        : ""}
+                    ${isCompleted ? "text-slate-400 dark:text-white/30"        : ""}
+                    ${isDimmed    ? "text-slate-300 dark:text-white/15"        : ""}
                   `}>
                     {s.sub}
                   </p>
@@ -79,7 +79,7 @@ export default function ImportStepHeader({ step, onClose }: ImportStepHeaderProp
                 <div className="w-20 mx-2 mb-8 flex items-center">
                   <div className="relative w-full h-px">
                     {/* Base track */}
-                    <div className="absolute inset-0 bg-white/10 rounded-full" />
+                    <div className="absolute inset-0 bg-slate-200 dark:bg-white/10 rounded-full" />
                     {/* Filled portion */}
                     <div
                       className="absolute inset-y-0 left-0 bg-[#f43f5e]/60 rounded-full transition-all duration-500"

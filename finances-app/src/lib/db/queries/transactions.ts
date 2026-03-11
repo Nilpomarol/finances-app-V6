@@ -104,6 +104,23 @@ export async function getTransactions(
   return result.rows as unknown as TransactionWithRelations[]
 }
 
+/** Retorna els períodes (any + mes) que tenen almenys una transacció */
+export async function getDistinctPeriods(
+  userId: string,
+): Promise<{ mes: number; any: number }[]> {
+  const db = getDb()
+  const result = await db.execute({
+    sql: `SELECT DISTINCT
+            CAST(strftime('%Y', CAST(data/1000 AS INTEGER), 'unixepoch') AS INTEGER) as any,
+            CAST(strftime('%m', CAST(data/1000 AS INTEGER), 'unixepoch') AS INTEGER) as mes
+          FROM transactions
+          WHERE user_id = ? AND eliminat = false
+          ORDER BY any DESC, mes DESC`,
+    args: [userId],
+  })
+  return result.rows as unknown as { mes: number; any: number }[]
+}
+
 /** Obté els deutes (splits) associats a una transacció concreta */
 export async function getTransactionSplits(transaccioId: string): Promise<TransactionSplit[]> {
   const db = getDb()
@@ -176,7 +193,7 @@ export async function createTransaction(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false)`,
       args: [
         id, userId, data.concepte, data.data, data.import_trs,
-        data.notes ?? null, data.compte_id, data.compte_desti_id ?? null,
+        data.notes ?? null, data.compte_id ?? null, data.compte_desti_id ?? null,
         data.categoria_id ?? null, data.esdeveniment_id ?? null,
         data.event_tag_id ?? null, data.tipus, data.recurrent ? 1 : 0,
         data.liquidacio_persona_id ?? null, data.pagat_per_id ?? null, ts,

@@ -5,7 +5,7 @@ import EntityTransactionsModal from "@/components/shared/EntityTransactionsModal
 import type { EntityTransactionsEntity } from "@/components/shared/EntityTransactionsModal"
 import { formatEuros } from "@/lib/utils"
 import { cn } from "@/lib/utils"
-import { ArrowDownRight, ArrowUpRight, ChevronRight, Users, Pin, Check } from "lucide-react"
+import { ArrowDownRight, ArrowUpRight, ChevronRight, Users, Check } from "lucide-react"
 
 interface Kpis {
   patrimoni: number
@@ -60,7 +60,7 @@ export function DashboardMobile({ accounts, transactions, kpis, nomMesActual }: 
     : 100
 
   return (
-    <div className="flex flex-col min-h-screen" style={{ background: "linear-gradient(to bottom, #0e1a2e 0px, #0e1a2e 200px, #f8fafc 340px)" }}>
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950">
 
       {/* ══════════════════════════════════════════════════════════════════
           HERO — dark, immersive
@@ -194,24 +194,24 @@ export function DashboardMobile({ accounts, transactions, kpis, nomMesActual }: 
           <div className="grid grid-cols-2 divide-x divide-slate-50 dark:divide-slate-800">
             <div className="px-5 py-4">
               <div className="flex items-center gap-1.5 mb-2">
-                <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                  <ArrowUpRight className="w-3 h-3 text-emerald-600" />
+                <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                  <ArrowUpRight className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ingressos</span>
               </div>
-              <p className="text-xl font-bold text-slate-900 tabular-nums leading-none">
+              <p className="text-xl font-bold text-slate-900 dark:text-white tabular-nums leading-none">
                 {formatEuros(kpis.ingressos)}
               </p>
             </div>
 
             <div className="px-5 py-4">
               <div className="flex items-center gap-1.5 mb-2">
-                <div className="w-5 h-5 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                  <ArrowDownRight className="w-3 h-3 text-rose-600" />
+                <div className="w-5 h-5 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center shrink-0">
+                  <ArrowDownRight className="w-3 h-3 text-rose-600 dark:text-rose-400" />
                 </div>
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Despeses</span>
               </div>
-              <p className="text-xl font-bold text-slate-900 tabular-nums leading-none">
+              <p className="text-xl font-bold text-slate-900 dark:text-white tabular-nums leading-none">
                 {formatEuros(kpis.despeses)}
               </p>
             </div>
@@ -229,7 +229,7 @@ export function DashboardMobile({ accounts, transactions, kpis, nomMesActual }: 
               </span>
             </div>
             {/* Spend bar — shows despeses vs ingressos */}
-            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-slate-100 dark:bg-slate-700/50 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-1000"
                 style={{
@@ -249,10 +249,10 @@ export function DashboardMobile({ accounts, transactions, kpis, nomMesActual }: 
       ══════════════════════════════════════════════════════════════════ */}
       <div className="mt-7 px-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-slate-900">Comptes</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white">Comptes</h2>
           <Link
             to="/comptes"
-            className="text-xs font-semibold text-slate-400 flex items-center gap-0.5 hover:text-slate-700 transition-colors"
+            className="text-xs font-semibold text-slate-400 flex items-center gap-0.5 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
           >
             Gestionar <ChevronRight className="w-3.5 h-3.5" />
           </Link>
@@ -288,10 +288,10 @@ export function DashboardMobile({ accounts, transactions, kpis, nomMesActual }: 
       ══════════════════════════════════════════════════════════════════ */}
       <div className="mt-7 px-4 pb-12">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-slate-900">Activitat</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white">Activitat</h2>
           <Link
             to="/transaccions"
-            className="text-xs font-semibold text-slate-400 flex items-center gap-0.5 hover:text-slate-700 transition-colors"
+            className="text-xs font-semibold text-slate-400 flex items-center gap-0.5 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
           >
             Veure tot <ChevronRight className="w-3.5 h-3.5" />
           </Link>
@@ -319,7 +319,7 @@ export function DashboardMobile({ accounts, transactions, kpis, nomMesActual }: 
                 <div
                   key={tx.id}
                   className={cn(
-                    "flex items-center gap-3.5 px-5 py-3.5 active:bg-slate-50 cursor-pointer transition-colors",
+                    "flex items-center gap-3.5 px-5 py-3.5 active:bg-slate-50 dark:active:bg-slate-800/50 cursor-pointer transition-colors",
                     idx < recentTxs.length - 1 ? "border-b border-slate-50 dark:border-slate-800" : ""
                   )}
                   onClick={() => handleTxClick(tx)}
@@ -335,7 +335,7 @@ export function DashboardMobile({ accounts, transactions, kpis, nomMesActual }: 
                     {/* Category color dot */}
                     {tx.categoria_color && (
                       <div
-                        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white"
+                        className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900"
                         style={{ backgroundColor: tx.categoria_color }}
                       />
                     )}
@@ -374,7 +374,7 @@ export function DashboardMobile({ accounts, transactions, kpis, nomMesActual }: 
                       <p className={cn(
                         "text-sm font-bold tabular-nums",
                         tx.tipus === "ingres" ? "text-emerald-600" :
-                        tx.tipus === "despesa" ? "text-slate-800" : "text-sky-600"
+                        tx.tipus === "despesa" ? "text-slate-800 dark:text-slate-200" : "text-sky-600"
                       )}>
                         {tx.tipus === "ingres" ? "+" : tx.tipus === "despesa" ? "−" : ""}
                         {formatEuros(tx.import_trs)}

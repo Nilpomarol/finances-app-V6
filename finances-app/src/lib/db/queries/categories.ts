@@ -93,7 +93,7 @@ export async function getCategoryById(
 /** Retorna el resum de despesa del mes actual i any actual per categoria */
 export async function getCategorySummaryCurrentMonth(
   userId: string
-): Promise<Array<{ categoria_id: string; total: number; total_any: number; count_any: number }>> {
+): Promise<Array<{ categoria_id: string; total: number; total_any: number; count_any: number; count_mes: number }>> {
   const db = getDb()
   const n = new Date()
   const monthStart = new Date(n.getFullYear(), n.getMonth(), 1).getTime()

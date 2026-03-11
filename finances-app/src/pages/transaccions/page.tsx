@@ -151,6 +151,7 @@ export default function TransaccionsPage() {
       title: `Eliminar "${tx.concepte}"?`,
       action: async () => {
         setConfirmDialog(d => ({ ...d, open: false }))
+        setViewingTransaction(null)
         await deleteTransaction(tx.id, userId)
         loadTransactions()
       },
@@ -256,7 +257,7 @@ export default function TransaccionsPage() {
   )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
 
       {/* ── Desktop header ── */}
       <div className="hidden sm:block">
@@ -272,7 +273,7 @@ export default function TransaccionsPage() {
       </div>
 
       {/* ── Mobile title ── */}
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight sm:hidden">
+      <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight leading-none sm:hidden">
         Transaccions
       </h1>
 
