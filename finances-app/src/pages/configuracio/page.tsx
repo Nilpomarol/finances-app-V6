@@ -348,7 +348,7 @@ export default function ConfiguracioPage() {
                   <p className="text-sm font-semibold text-slate-900 dark:text-white">Versió de l'App</p>
                   <div className="flex items-center gap-2 mt-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-300">v1.0.0</span>
+                    <span className="text-xs font-mono font-semibold text-slate-700 dark:text-slate-300">v1.1.0</span>
                     <span className="text-xs text-slate-400">· PWA</span>
                   </div>
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
