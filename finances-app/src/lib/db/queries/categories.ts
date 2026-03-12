@@ -22,9 +22,9 @@ export async function createCategory(
   const ts = now()
 
   await db.execute({
-    sql: `INSERT INTO categories (id, user_id, nom, tipus, pressupost_mensual, color, icona, data_modificacio, eliminat)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, false)`,
-    args: [id, userId, data.nom, data.tipus, data.pressupost_mensual ?? null, data.color, data.icona, ts],
+    sql: `INSERT INTO categories (id, user_id, nom, tipus, pressupost_mensual, color, icona, es_fix, data_modificacio, eliminat)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, false)`,
+    args: [id, userId, data.nom, data.tipus, data.pressupost_mensual ?? null, data.color, data.icona, data.es_fix ? 1 : 0, ts],
   })
 
   return { id, user_id: userId, ...data, data_modificacio: ts, eliminat: false }
@@ -43,6 +43,7 @@ export async function updateCategory(
               pressupost_mensual = ?,
               color = COALESCE(?, color),
               icona = COALESCE(?, icona),
+              es_fix = COALESCE(?, es_fix),
               data_modificacio = ?
           WHERE id = ? AND user_id = ? AND eliminat = false`,
     args: [
@@ -51,6 +52,7 @@ export async function updateCategory(
       data.pressupost_mensual ?? null,
       data.color ?? null,
       data.icona ?? null,
+      data.es_fix !== undefined ? (data.es_fix ? 1 : 0) : null,
       now(),
       id,
       userId,

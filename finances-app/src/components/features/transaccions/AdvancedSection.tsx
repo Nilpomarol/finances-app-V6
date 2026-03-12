@@ -106,7 +106,7 @@ export function AdvancedSection({ events, availableTags, currentEventId, default
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Despesa recurrent</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Subscripció / Recurrent</span>
               </div>
               <button
                 type="button"

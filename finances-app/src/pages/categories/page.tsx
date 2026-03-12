@@ -6,7 +6,7 @@ import type { Category } from "@/types/database"
 import CategoryModal from "@/components/features/categories/CategoryModal"
 import DynamicIcon from "@/components/shared/DynamicIcon"
 import { Button } from "@/components/ui/button"
-import { Plus, Tag, TrendingDown, TrendingUp, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Plus, Tag, TrendingDown, TrendingUp, MoreHorizontal, Pencil, Trash2, Anchor } from "lucide-react"
 import { EmptyState } from "@/components/shared/EmptyState"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/shared/PageHeader"
@@ -88,6 +88,7 @@ export default function CategoriesPage() {
     .filter((c) => c.tipus === activeTab)
     .sort((a, b) => getSummary(b.id).total_any - getSummary(a.id).total_any)
   const totalAnyAll = filtered.reduce((sum, c) => sum + getSummary(c.id).total_any, 0)
+  const totalMonthAll = filtered.reduce((sum, c) => sum + getSummary(c.id).total, 0)
   const despesaCount = categories.filter((c) => c.tipus === "despesa").length
   const ingresCount = categories.filter((c) => c.tipus === "ingres").length
 
@@ -174,6 +175,7 @@ export default function CategoriesPage() {
           {filtered.map((cat) => {
             const { total: monthTotal, total_any, count_any, count_mes } = getSummary(cat.id)
             const yearPct = totalAnyAll > 0 ? (total_any / totalAnyAll) * 100 : 0
+            const monthPct = totalMonthAll > 0 ? (monthTotal / totalMonthAll) * 100 : 0
             const budgetStatus = getBudgetStatus(cat)
             const pct = cat.pressupost_mensual
               ? Math.min((monthTotal / cat.pressupost_mensual) * 100, 100) : 0
@@ -196,7 +198,7 @@ export default function CategoriesPage() {
                   {/* Icon */}
                   <div
                     className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ backgroundColor: cat.color + "18" }}
+                    style={{ backgroundColor: cat.color + "30" }}
                   >
                     <DynamicIcon name={cat.icona} className="w-5 h-5" style={{ color: cat.color }} />
                   </div>
@@ -204,9 +206,17 @@ export default function CategoriesPage() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-sm text-slate-900 dark:text-white truncate leading-tight">
-                        {cat.nom}
-                      </p>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="font-semibold text-sm text-slate-900 dark:text-white truncate leading-tight">
+                          {cat.nom}
+                        </p>
+                        {cat.es_fix && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold shrink-0">
+                            <Anchor className="w-2.5 h-2.5" />
+                            Fix
+                          </span>
+                        )}
+                      </div>
 
                       {/* Actions dropdown */}
                       <div className="relative shrink-0">
@@ -250,7 +260,52 @@ export default function CategoriesPage() {
                     </div>
 
                     {/* Budget bar or activity */}
-                    {cat.pressupost_mensual ? (
+                    {cat.tipus === "ingres" ? (
+                      // ── Income: month contribution + year bar ──
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-400 tabular-nums">
+                            {monthTotal > 0 ? (
+                              <>
+                                <span className="font-semibold" style={{ color: cat.color }}>
+                                  {formatEuros(monthTotal)}
+                                </span>
+                                {" aquest mes"}
+                                {count_mes > 0 && <span className="ml-1 opacity-70">({count_mes} transacc.)</span>}
+                              </>
+                            ) : (
+                              "Sense activitat aquest mes"
+                            )}
+                          </span>
+                          {monthPct > 0 && (
+                            <span className="font-semibold tabular-nums" style={{ color: cat.color }}>
+                              {monthPct.toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${monthPct}%`, backgroundColor: cat.color }}
+                          />
+                        </div>
+                        {count_any > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center text-[11px] text-slate-400 tabular-nums">
+                              <span>{formatEuros(total_any)} · {count_any} transacc. enguany</span>
+                              <span>{yearPct.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${yearPct}%`, backgroundColor: cat.color }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : cat.pressupost_mensual ? (
+                      // ── Expense with budget ──
                       <div className="mt-2 space-y-1.5">
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-slate-400 tabular-nums">
@@ -285,7 +340,7 @@ export default function CategoriesPage() {
                             </div>
                             <div className="h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                               <div
-                                className="h-full rounded-full transition-all duration-500 opacity-50"
+                                className="h-full rounded-full transition-all duration-500"
                                 style={{ width: `${yearPct}%`, backgroundColor: cat.color }}
                               />
                             </div>
@@ -293,6 +348,7 @@ export default function CategoriesPage() {
                         )}
                       </div>
                     ) : (
+                      // ── Expense without budget ──
                       <div className="mt-1 space-y-1">
                         <p className="text-xs text-slate-400 tabular-nums">
                           {monthTotal > 0 ? (
@@ -315,7 +371,7 @@ export default function CategoriesPage() {
                             </div>
                             <div className="h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                               <div
-                                className="h-full rounded-full transition-all duration-500 opacity-50"
+                                className="h-full rounded-full transition-all duration-500"
                                 style={{ width: `${yearPct}%`, backgroundColor: cat.color }}
                               />
                             </div>

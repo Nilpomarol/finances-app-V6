@@ -11,6 +11,7 @@ const AnalisiPage = lazy(() => import("@/pages/analisi/page"))
 const EsdevenimentsPage = lazy(() => import("@/pages/esdeveniments/page"))
 const EsdevenimentDetallPage = lazy(() => import("@/pages/esdeveniments/[id]/page"))
 const ConfiguracioPage = lazy(() => import("@/pages/configuracio/page"))
+const DbTestPage = lazy(() => import("@/pages/db-test/page"))
 
 function RouteFallback() {
   return <div className="p-8 text-center text-muted-foreground animate-pulse">Carregant...</div>
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       { path: "esdeveniments", element: lazyElement(<EsdevenimentsPage />) },
       { path: "esdeveniments/:id", element: lazyElement(<EsdevenimentDetallPage />) },
       { path: "configuracio", element: lazyElement(<ConfiguracioPage />) },
+      { path: "db-test", element: lazyElement(<DbTestPage />) },
     ],
   },
 ])

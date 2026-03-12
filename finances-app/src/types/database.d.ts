@@ -31,6 +31,7 @@ export interface Category {
   pressupost_mensual: number | null
   color: string
   icona: string
+  es_fix: boolean
   data_modificacio: number
   eliminat: boolean
 }
@@ -115,8 +116,9 @@ export interface TransactionWithRelations extends Transaction {
   compte_color?: string
   compte_desti_nom?: string
   categoria_nom?: string
-  categoria_color?: stringa
+  categoria_color?: string
   categoria_icona?: string
+  categoria_es_fix?: boolean
   esdeveniment_nom?: string
   event_tag_nom?: string
   event_tag_color?: string

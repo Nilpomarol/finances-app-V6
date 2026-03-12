@@ -20,7 +20,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Button } from "@/components/ui/button"
-import { Loader2, X, TrendingDown, TrendingUp } from "lucide-react"
+import { Loader2, X, TrendingDown, TrendingUp, Anchor, Shuffle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 
@@ -30,6 +30,7 @@ const categorySchema = z.object({
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Color invàlid"),
   icona: z.string().min(1, "Selecciona una icona"),
   pressupost_mensual: z.coerce.number().min(0).nullable().optional(),
+  es_fix: z.boolean(),
 })
 
 type CategoryFormValues = {
@@ -38,6 +39,7 @@ type CategoryFormValues = {
   color: string
   icona: string
   pressupost_mensual?: number | null
+  es_fix: boolean
 }
 
 const defaultValues: CategoryFormValues = {
@@ -46,6 +48,7 @@ const defaultValues: CategoryFormValues = {
   color: "#6366f1",
   icona: "tag",
   pressupost_mensual: null,
+  es_fix: false,
 }
 
 const COLOR_PRESETS = [
@@ -81,6 +84,7 @@ export default function CategoryModal({
         color: category.color,
         icona: category.icona,
         pressupost_mensual: category.pressupost_mensual,
+        es_fix: Boolean(category.es_fix),
       })
     } else {
       form.reset({ ...defaultValues, tipus: defaultTipus })
@@ -96,6 +100,7 @@ export default function CategoryModal({
         color: values.color,
         icona: values.icona,
         pressupost_mensual: values.pressupost_mensual ?? null,
+        es_fix: values.es_fix,
       }
       if (isEditing && category) {
         await updateCategory(category.id, userId, data)
@@ -246,6 +251,49 @@ export default function CategoryModal({
                 />
               )}
             </div>
+
+            {/* Fixa / Variable */}
+            <FormField
+              control={form.control}
+              name="es_fix"
+              render={({ field }) => (
+                <FormItem className="mx-5 mb-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl overflow-hidden">
+                  <div className="flex gap-1.5 p-1">
+                    <button
+                      type="button"
+                      onClick={() => field.onChange(true)}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-all",
+                        field.value
+                          ? "bg-indigo-500 text-white shadow-sm"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      )}
+                    >
+                      <Anchor className="w-3.5 h-3.5" />
+                      Fixa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => field.onChange(false)}
+                      className={cn(
+                        "flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-all",
+                        !field.value
+                          ? "bg-slate-400 text-white shadow-sm dark:bg-slate-600"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      )}
+                    >
+                      <Shuffle className="w-3.5 h-3.5" />
+                      Variable
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 px-4 pb-3">
+                    {field.value
+                      ? "Sempre presente cada mes (lloguer, nòmina, transport, subscripcions...)"
+                      : "Esporàdica o imprevisible (sortides, compres puntuals...)"}
+                  </p>
+                </FormItem>
+              )}
+            />
 
             {/* Color */}
             <FormField

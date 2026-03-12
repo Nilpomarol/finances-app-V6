@@ -82,6 +82,7 @@ export async function getTransactions(
             c.nom as categoria_nom,
             c.color as categoria_color,
             c.icona as categoria_icona,
+            c.es_fix as categoria_es_fix,
             e.nom as esdeveniment_nom,
             et.nom as event_tag_nom,
             p.nom as persona_nom,
