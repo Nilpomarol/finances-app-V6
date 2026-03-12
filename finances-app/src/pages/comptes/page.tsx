@@ -7,7 +7,6 @@ import {
   deleteAccountWithTransactions,
   deleteAccountUnlinking,
   deleteAccountTransferring,
-  recalculateAllBalances,
 } from "@/lib/db/queries/accounts"
 import { formatEuros } from "@/lib/utils"
 import type { Account } from "@/types/database"
@@ -16,11 +15,10 @@ import DeleteAccountModal from "@/components/features/comptes/DeleteAccountModal
 import EntityTransactionsModal from "@/components/shared/EntityTransactionsModal"
 import type { EntityTransactionsEntity } from "@/components/shared/EntityTransactionsModal"
 import { Button } from "@/components/ui/button"
-import { Plus, Wallet, PiggyBank, Banknote, BarChart3, RefreshCw, Landmark } from "lucide-react"
+import { Plus, Wallet, PiggyBank, Banknote, BarChart3, Landmark } from "lucide-react"
 import { ItemActions } from "@/components/shared/ItemActions"
 import { cn } from "@/lib/utils"
 import { EmptyState } from "@/components/shared/EmptyState"
-import { useToast } from "@/hooks/use-toast"
 
 const TIPUS_LABELS: Record<Account["tipus"], string> = {
   banc: "Compte Bancari",
@@ -40,10 +38,8 @@ const card = "rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-wh
 
 export default function ComptesPage() {
   const { userId } = useAuthStore()
-  const { toast } = useToast()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isRecalculating, setIsRecalculating] = useState(false)
 
   const [showAccountModal, setShowAccountModal] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | undefined>()
@@ -70,20 +66,6 @@ export default function ComptesPage() {
     window.addEventListener("finances:refresc", loadAccounts)
     return () => window.removeEventListener("finances:refresc", loadAccounts)
   }, [loadAccounts])
-
-  const handleRecalculate = async () => {
-    if (!userId) return
-    setIsRecalculating(true)
-    try {
-      await recalculateAllBalances(userId)
-      await loadAccounts()
-      toast({ title: "Saldos recalculats correctament" })
-    } catch {
-      toast({ variant: "destructive", title: "Error en recalcular els saldos" })
-    } finally {
-      setIsRecalculating(false)
-    }
-  }
 
   const handleEdit = (account: Account) => {
     setEditingAccount(account)
@@ -139,25 +121,6 @@ export default function ComptesPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRecalculate}
-            disabled={isRecalculating}
-            className="sm:hidden shrink-0"
-            aria-label="Recalcular saldos"
-          >
-            <RefreshCw className={cn("w-4 h-4", isRecalculating && "animate-spin")} />
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleRecalculate}
-            disabled={isRecalculating}
-            className="hidden sm:flex h-10 px-5 text-sm font-semibold"
-          >
-            <RefreshCw className={cn("w-4 h-4 mr-2", isRecalculating && "animate-spin")} />
-            Recalcular saldos
-          </Button>
           <Button
             onClick={() => {
               setEditingAccount(undefined)

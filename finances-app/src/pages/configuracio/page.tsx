@@ -5,6 +5,7 @@ import { getCategories } from "@/lib/db/queries/categories"
 import { getRules, createRule, deleteRule, type AssignmentRule } from "@/lib/db/queries/rules"
 import { getTransactions } from "@/lib/db/queries/transactions"
 import { recalculateAllBalances } from "@/lib/db/queries/accounts"
+import { syncRecurringTemplatesFromTransactions } from "@/lib/db/queries/recurring-templates"
 import { exportUserData } from "@/lib/export-import"
 import type { Category, TransactionWithRelations } from "@/types/database"
 import { Button } from "@/components/ui/button"
@@ -16,7 +17,7 @@ import { PageHeader } from "@/components/shared/PageHeader"
 import { cn } from "@/lib/utils"
 import {
   Trash2, Plus, Sparkles, Download, Loader2, ArrowRight,
-  RefreshCw, CheckCircle2, Shield, Sun, Moon, LogOut
+  RefreshCw, CheckCircle2, Shield, Sun, Moon, LogOut, Repeat
 } from "lucide-react"
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog"
 
@@ -72,6 +73,7 @@ export default function ConfiguracioPage() {
 
   const [isExporting, setIsExporting] = useState(false)
   const [isRecalculating, setIsRecalculating] = useState(false)
+  const [isSyncingRecurrents, setIsSyncingRecurrents] = useState(false)
 
   const [newKeyword, setNewKeyword] = useState("")
   const [newCategoryId, setNewCategoryId] = useState("")
@@ -128,6 +130,24 @@ export default function ConfiguracioPage() {
       toast({ variant: "destructive", title: "Error al recalcular els saldos." })
     } finally {
       setIsRecalculating(false)
+    }
+  }
+
+  const handleSyncRecurrents = async () => {
+    if (!userId) return
+    setIsSyncingRecurrents(true)
+    try {
+      const result = await syncRecurringTemplatesFromTransactions(userId)
+      toast({
+        title: "Recurrents sincronitzats",
+        description: result.created > 0
+          ? `${result.created} templates nous creats.`
+          : "Tots els recurrents ja estaven sincronitzats.",
+      })
+    } catch {
+      toast({ variant: "destructive", title: "Error al sincronitzar recurrents." })
+    } finally {
+      setIsSyncingRecurrents(false)
     }
   }
 
@@ -229,13 +249,13 @@ export default function ConfiguracioPage() {
         </p>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-            {[1, 2, 3, 4, 5].map(i => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {[1, 2, 3, 4, 5, 6].map(i => (
               <div key={i} className="animate-pulse rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900 h-44" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
 
             {/* MODE FOSC */}
             <div className={card}>
@@ -295,6 +315,25 @@ export default function ConfiguracioPage() {
                 <Button onClick={handleRecalculate} disabled={isRecalculating} size="sm" variant="outline" className="w-full">
                   {isRecalculating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
                   {isRecalculating ? "Recalculant..." : "Recalcular tot"}
+                </Button>
+              </div>
+            </div>
+
+            {/* SINCRONITZAR RECURRENTS */}
+            <div className={card}>
+              <div className="p-5 flex flex-col gap-4 h-full">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-500/10 flex items-center justify-center shrink-0">
+                  <Repeat className="w-5 h-5 text-teal-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Sincronitzar Recurrents</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
+                    Crea templates per a transaccions marcades com a recurrents, amb data d'inici a la primera transacció real.
+                  </p>
+                </div>
+                <Button onClick={handleSyncRecurrents} disabled={isSyncingRecurrents} size="sm" variant="outline" className="w-full">
+                  {isSyncingRecurrents ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Repeat className="w-4 h-4 mr-2" />}
+                  {isSyncingRecurrents ? "Sincronitzant..." : "Sincronitzar"}
                 </Button>
               </div>
             </div>

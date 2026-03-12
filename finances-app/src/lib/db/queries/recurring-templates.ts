@@ -201,6 +201,90 @@ export async function skipRecurringMonth(
   })
 }
 
+/** Syncronitza templates recurrents a partir de transaccions marcades com a recurrents.
+ *  - Crea templates nous amb data_inici = primera transacció del grup.
+ *  - Actualitza data_inici en templates existents a la primera transacció real. */
+export async function syncRecurringTemplatesFromTransactions(
+  userId: string,
+): Promise<{ created: number }> {
+  const db = getDb()
+
+  const result = await db.execute({
+    sql: `SELECT concepte, compte_id, categoria_id, tipus, pagat_per_id, notes,
+                 CAST(ROUND(AVG(import_trs)) AS INTEGER) as import_trs,
+                 CAST(ROUND(AVG(CAST(strftime('%d', CAST(data/1000 AS INTEGER), 'unixepoch') AS INTEGER))) AS INTEGER) as dia_del_mes,
+                 MIN(data) as primera_data
+          FROM transactions
+          WHERE user_id = ? AND eliminat = 0 AND recurrent = 1
+            AND tipus IN ('ingres', 'despesa')
+          GROUP BY concepte, COALESCE(compte_id, ''), COALESCE(categoria_id, ''), tipus`,
+    args: [userId],
+  })
+
+  const rows = result.rows as unknown as Array<{
+    concepte: string
+    compte_id: string | null
+    categoria_id: string | null
+    tipus: "ingres" | "despesa"
+    pagat_per_id: string | null
+    notes: string | null
+    import_trs: number
+    dia_del_mes: number
+    primera_data: number
+  }>
+
+  const tx = await db.transaction("write")
+  let created = 0
+
+  try {
+    for (const row of rows) {
+      const existing = await tx.execute({
+        sql: `SELECT id, data_inici FROM recurring_templates
+              WHERE user_id = ?
+                AND concepte = ?
+                AND COALESCE(compte_id, '') = COALESCE(?, '')
+                AND COALESCE(categoria_id, '') = COALESCE(?, '')
+                AND tipus = ?
+                AND eliminat = 0
+              LIMIT 1`,
+        args: [userId, row.concepte, row.compte_id, row.categoria_id, row.tipus],
+      })
+
+      const ts = now()
+      if (existing.rows.length === 0) {
+        // Create new template with data_inici = date of first transaction
+        await tx.execute({
+          sql: `INSERT INTO recurring_templates
+                  (id, user_id, concepte, import_trs, user_import, compte_id, categoria_id, tipus,
+                   dia_del_mes, notes, pagat_per_id, darrer_mes_gestionat, data_inici, data_modificacio, eliminat)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 0)`,
+          args: [
+            generateId(), userId, row.concepte, row.import_trs, row.import_trs,
+            row.compte_id, row.categoria_id, row.tipus,
+            row.dia_del_mes, row.notes, row.pagat_per_id, row.primera_data, ts,
+          ],
+        })
+        created++
+      } else {
+        const existingRow = existing.rows[0] as unknown as { id: string; data_inici: number | null }
+        // Always align data_inici to the first actual transaction date
+        if (existingRow.data_inici !== row.primera_data) {
+          await tx.execute({
+            sql: `UPDATE recurring_templates SET data_inici = ?, data_modificacio = ? WHERE id = ? AND user_id = ?`,
+            args: [row.primera_data, ts, existingRow.id, userId],
+          })
+        }
+      }
+    }
+
+    await tx.commit()
+    return { created }
+  } catch (error) {
+    await tx.rollback()
+    throw error
+  }
+}
+
 /** Retorna el Set de template_ids saltats per a un mes concret. */
 export async function getSkippedTemplateIds(
   userId: string,
