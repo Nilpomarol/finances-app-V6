@@ -39,7 +39,7 @@ export async function getTransactions(
 ): Promise<TransactionWithRelations[]> {
   const db = getDb()
 
-  const conditions: string[] = ["t.user_id = ?", "t.eliminat = false"]
+  const conditions: string[] = ["t.user_id = ?", "t.eliminat = false", "t.concepte != 'Saldo inicial'"]
   const args: (string | number | boolean | null)[] = [opts.userId]
 
   if (opts.compteId) {
@@ -114,7 +114,7 @@ export async function getDistinctPeriods(
             CAST(strftime('%Y', CAST(data/1000 AS INTEGER), 'unixepoch') AS INTEGER) as any,
             CAST(strftime('%m', CAST(data/1000 AS INTEGER), 'unixepoch') AS INTEGER) as mes
           FROM transactions
-          WHERE user_id = ? AND eliminat = false
+          WHERE user_id = ? AND eliminat = false AND concepte != 'Saldo inicial'
           ORDER BY any DESC, mes DESC`,
     args: [userId],
   })

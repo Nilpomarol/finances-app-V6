@@ -109,7 +109,7 @@ function MobileFilters({
   return (
     <div className="space-y-2">
 
-      {/* Row 1: period mode + period selectors + filter toggle + reset */}
+      {/* Row 1: period mode toggle + (year selector in "any" mode) + icons */}
       <div className="flex items-center gap-2">
         <div className="flex rounded-md border border-input bg-background overflow-hidden shrink-0">
           <button
@@ -147,35 +147,18 @@ function MobileFilters({
           </button>
         </div>
 
-        {periodeMode === "mes" && (
-          <Select
-            value={String(selectedMonth)}
-            onValueChange={(v) => setPeriode({ mes: Number(v), any: selectedYear })}
-          >
-            <SelectTrigger className="w-[120px] bg-background capitalize">
+        {/* Year selector shown inline only in "any" mode (fits on one row) */}
+        {periodeMode === "any" && (
+          <Select value={String(selectedYear)} onValueChange={handleYearChange}>
+            <SelectTrigger className="w-[80px] bg-background">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {availableMonths.map((m) => (
-                <SelectItem key={m.value} value={m.value} className="capitalize">
-                  {m.label}
-                </SelectItem>
+              {availableYears.map((y) => (
+                <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
-
-        {periodeMode !== "alltime" && (
-        <Select value={String(selectedYear)} onValueChange={handleYearChange}>
-          <SelectTrigger className="w-[80px] bg-background">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {availableYears.map((y) => (
-              <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         )}
 
         <div className="ml-auto flex items-center gap-1">
@@ -208,6 +191,37 @@ function MobileFilters({
           </button>
         </div>
       </div>
+
+      {/* Row 2 (mes mode only): month + year selectors on their own row to avoid overflow */}
+      {periodeMode === "mes" && (
+        <div className="flex items-center gap-2">
+          <Select
+            value={String(selectedMonth)}
+            onValueChange={(v) => setPeriode({ mes: Number(v), any: selectedYear })}
+          >
+            <SelectTrigger className="flex-1 min-w-0 bg-background capitalize">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableMonths.map((m) => (
+                <SelectItem key={m.value} value={m.value} className="capitalize">
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(selectedYear)} onValueChange={handleYearChange}>
+            <SelectTrigger className="w-[80px] shrink-0 bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map((y) => (
+                <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Collapsible: account + category + events */}
       {filtersOpen && (
@@ -311,7 +325,7 @@ export function MobileAnalysisView({
   const [activeTab, setActiveTab] = useState<TabId>("resum")
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
 
       <h1 className="text-xl font-bold">Anàlisi</h1>
 

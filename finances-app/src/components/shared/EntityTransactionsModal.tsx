@@ -82,7 +82,7 @@ export default function EntityTransactionsModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg p-0 gap-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/50 shadow-2xl max-h-[85vh] h-fit flex flex-col [&>button:last-of-type]:hidden">
+        <DialogContent className="w-[calc(100%-2rem)] sm:max-w-lg p-0 gap-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700/50 shadow-2xl max-h-[85dvh] flex flex-col [&>button:last-of-type]:hidden">
 
           {/* Colored header banner */}
           <div
