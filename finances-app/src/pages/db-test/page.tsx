@@ -129,13 +129,3 @@ export default function DbTestPage() {
     </div>
   )
 }
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
