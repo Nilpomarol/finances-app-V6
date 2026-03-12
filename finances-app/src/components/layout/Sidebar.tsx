@@ -13,6 +13,7 @@ import {
   Sun,
   Moon,
   TrendingUp,
+  RefreshCw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -31,6 +32,7 @@ const mainNavItems: NavItemDef[] = [
 const financeNavItems: NavItemDef[] = [
   { to: "/transaccions", label: "Transaccions", icon: ArrowLeftRight },
   { to: "/comptes", label: "Comptes", icon: Wallet },
+  { to: "/recurrents", label: "Recurrents", icon: RefreshCw },
 ]
 
 const manageNavItems: NavItemDef[] = [

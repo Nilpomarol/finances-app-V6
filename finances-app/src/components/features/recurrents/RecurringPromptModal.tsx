@@ -3,7 +3,6 @@ import { RefreshCw, Trash2, SkipForward, Plus, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ColorDot } from "@/components/shared/ColorDot"
-import { formatEuros } from "@/lib/utils"
 import { createTransaction } from "@/lib/db/queries/transactions"
 import {
   markRecurringTemplateHandled,

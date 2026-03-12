@@ -11,6 +11,7 @@ import {
   CalendarDays,
   Plus,
   X,
+  RefreshCw,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
@@ -26,6 +27,7 @@ const rightNavItems = [
 
 const moreNavItems = [
   { to: "/comptes", label: "Comptes", icon: Wallet },
+  { to: "/recurrents", label: "Recurrents", icon: RefreshCw },
   { to: "/persones", label: "Persones", icon: Users },
   { to: "/categories", label: "Categories", icon: Tag },
   { to: "/esdeveniments", label: "Esdeveniments", icon: CalendarDays },
@@ -103,22 +105,22 @@ export default function MobileNav({ onNewTransaction }: MobileNavProps) {
 
       {/* Submenu panel */}
       {open && (
-        <div className="md:hidden fixed bottom-[4.5rem] right-0 left-0 z-50 bg-card border-t border-border/60 shadow-lg px-4 py-4">
-          <p className="px-1 mb-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 select-none">
+        <div className="md:hidden fixed bottom-[4.5rem] right-0 left-0 z-50 bg-card border-t border-border/60 shadow-lg px-4 py-3">
+          <p className="px-1 mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 select-none">
             Més opcions
           </p>
-          <div className="grid grid-cols-5 gap-1">
+          <div className="flex items-center">
             {moreNavItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
-                className="flex flex-col items-center gap-1 px-1 py-1.5"
+                className="flex-1 flex flex-col items-center gap-1"
               >
                 {({ isActive }) => (
                   <>
                     <span
                       className={cn(
-                        "flex items-center justify-center w-10 h-10 rounded-xl transition-colors shrink-0",
+                        "flex items-center justify-center w-9 h-9 rounded-xl transition-colors shrink-0",
                         isActive
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "bg-muted/60 text-muted-foreground"

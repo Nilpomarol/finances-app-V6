@@ -10,6 +10,7 @@ const PersonesPage = lazy(() => import("@/pages/persones/page"))
 const AnalisiPage = lazy(() => import("@/pages/analisi/page"))
 const EsdevenimentsPage = lazy(() => import("@/pages/esdeveniments/page"))
 const EsdevenimentDetallPage = lazy(() => import("@/pages/esdeveniments/[id]/page"))
+const RecurrentsPage = lazy(() => import("@/pages/recurrents/page"))
 const ConfiguracioPage = lazy(() => import("@/pages/configuracio/page"))
 const DbTestPage = lazy(() => import("@/pages/db-test/page"))
 
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { index: true, element: lazyElement(<DashboardPage />) },
       { path: "transaccions", element: lazyElement(<TransaccionsPage />) },
       { path: "comptes", element: lazyElement(<ComptesPage />) },
+      { path: "recurrents", element: lazyElement(<RecurrentsPage />) },
       { path: "categories", element: lazyElement(<CategoriesPage />) },
       { path: "persones", element: lazyElement(<PersonesPage />) },
       { path: "analisi", element: lazyElement(<AnalisiPage />) },

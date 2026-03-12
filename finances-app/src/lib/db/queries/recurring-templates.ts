@@ -5,6 +5,7 @@ import type { RecurringTemplate } from "@/types/database"
 export interface RecurringTemplateData {
   concepte: string
   import_trs: number
+  user_import: number
   compte_id: string | null
   categoria_id: string | null
   tipus: "ingres" | "despesa"
@@ -58,23 +59,24 @@ export async function upsertRecurringTemplateInTx(
     await tx.execute({
       sql: `UPDATE recurring_templates
             SET import_trs = ?,
+                user_import = ?,
                 dia_del_mes = ?,
                 notes = ?,
                 pagat_per_id = ?,
                 data_modificacio = ?
             WHERE id = ? AND user_id = ?`,
-      args: [data.import_trs, data.dia_del_mes, data.notes, data.pagat_per_id, ts, id, userId],
+      args: [data.import_trs, data.user_import, data.dia_del_mes, data.notes, data.pagat_per_id, ts, id, userId],
     })
   } else {
     await tx.execute({
       sql: `INSERT INTO recurring_templates
-              (id, user_id, concepte, import_trs, compte_id, categoria_id, tipus,
-               dia_del_mes, notes, pagat_per_id, darrer_mes_gestionat, data_modificacio, eliminat)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 0)`,
+              (id, user_id, concepte, import_trs, user_import, compte_id, categoria_id, tipus,
+               dia_del_mes, notes, pagat_per_id, darrer_mes_gestionat, data_inici, data_modificacio, eliminat)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 0)`,
       args: [
-        generateId(), userId, data.concepte, data.import_trs,
+        generateId(), userId, data.concepte, data.import_trs, data.user_import,
         data.compte_id, data.categoria_id, data.tipus,
-        data.dia_del_mes, data.notes, data.pagat_per_id, ts,
+        data.dia_del_mes, data.notes, data.pagat_per_id, ts, ts,
       ],
     })
   }
@@ -118,6 +120,53 @@ export async function markRecurringTemplateHandled(
   })
 }
 
+/** Retorna tots els templates actius ordenats per dia del mes (per a la vista de calendari). */
+export async function getAllActiveRecurringTemplates(
+  userId: string,
+): Promise<RecurringTemplate[]> {
+  const db = getDb()
+  const result = await db.execute({
+    sql: `SELECT * FROM recurring_templates
+          WHERE user_id = ? AND eliminat = 0
+          ORDER BY dia_del_mes ASC, concepte ASC`,
+    args: [userId],
+  })
+  return (result.rows as unknown as RecurringTemplate[]).map(r => ({
+    ...r,
+    eliminat: Boolean(r.eliminat),
+  }))
+}
+
+export interface UpdateRecurringTemplateData {
+  concepte: string
+  import_trs: number
+  dia_del_mes: number
+  compte_id: string | null
+  categoria_id: string | null
+  notes: string | null
+}
+
+/** Actualitza camps d'un template des de la pàgina de gestió. */
+export async function updateRecurringTemplate(
+  templateId: string,
+  userId: string,
+  data: UpdateRecurringTemplateData,
+): Promise<void> {
+  const db = getDb()
+  await db.execute({
+    sql: `UPDATE recurring_templates
+          SET concepte = ?, import_trs = ?, dia_del_mes = ?,
+              compte_id = ?, categoria_id = ?, notes = ?,
+              data_modificacio = ?
+          WHERE id = ? AND user_id = ?`,
+    args: [
+      data.concepte, data.import_trs, data.dia_del_mes,
+      data.compte_id, data.categoria_id, data.notes,
+      now(), templateId, userId,
+    ],
+  })
+}
+
 /** Elimina definitivament el template (Eliminar recurrent). */
 export async function eliminateRecurringTemplate(
   templateId: string,
@@ -130,4 +179,39 @@ export async function eliminateRecurringTemplate(
           WHERE id = ? AND user_id = ?`,
     args: [now(), templateId, userId],
   })
+}
+
+/** Marca un mes com a saltat per a un template. */
+export async function skipRecurringMonth(
+  templateId: string,
+  userId: string,
+  year: number,
+  month: number,
+): Promise<void> {
+  const db = getDb()
+  const existing = await db.execute({
+    sql: `SELECT id FROM recurring_skips WHERE template_id = ? AND user_id = ? AND year = ? AND month = ? AND eliminat = 0`,
+    args: [templateId, userId, year, month],
+  })
+  if (existing.rows.length > 0) return
+  await db.execute({
+    sql: `INSERT INTO recurring_skips (id, template_id, user_id, year, month, data_modificacio, eliminat)
+          VALUES (?, ?, ?, ?, ?, ?, 0)`,
+    args: [generateId(), templateId, userId, year, month, now()],
+  })
+}
+
+/** Retorna el Set de template_ids saltats per a un mes concret. */
+export async function getSkippedTemplateIds(
+  userId: string,
+  year: number,
+  month: number,
+): Promise<Set<string>> {
+  const db = getDb()
+  const result = await db.execute({
+    sql: `SELECT template_id FROM recurring_skips
+          WHERE user_id = ? AND year = ? AND month = ? AND eliminat = 0`,
+    args: [userId, year, month],
+  })
+  return new Set(result.rows.map(r => (r as unknown as { template_id: string }).template_id))
 }

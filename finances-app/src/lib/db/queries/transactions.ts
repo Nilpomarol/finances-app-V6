@@ -219,9 +219,11 @@ export async function createTransaction(
 
     // SINCRONITZEM EL TEMPLATE RECURRENT
     if (data.recurrent && (data.tipus === "ingres" || data.tipus === "despesa")) {
+      const splitTotal = (data.deutes ?? []).reduce((s, d) => s + d.import_degut, 0)
       await upsertRecurringTemplateInTx(tx, userId, {
         concepte: data.concepte,
         import_trs: data.import_trs,
+        user_import: data.import_trs - splitTotal,
         compte_id: data.compte_id ?? null,
         categoria_id: data.categoria_id ?? null,
         tipus: data.tipus,
@@ -345,9 +347,21 @@ export async function updateTransaction(
     const newRecurrent = data.recurrent !== undefined ? data.recurrent : Boolean(currentTx.recurrent)
     const mergedTipus = (data.tipus ?? currentTx.tipus) as string
     if (newRecurrent && (mergedTipus === "ingres" || mergedTipus === "despesa")) {
+      const mergedImport = data.import_trs ?? currentTx.import_trs
+      let splitTotal: number
+      if (data.deutes !== undefined) {
+        splitTotal = data.deutes.reduce((s, d) => s + d.import_degut, 0)
+      } else {
+        const existingSplits = await tx.execute({
+          sql: `SELECT COALESCE(SUM(import_degut), 0) as total FROM transaction_splits WHERE transaccio_id = ? AND eliminat = false`,
+          args: [id],
+        })
+        splitTotal = Number((existingSplits.rows[0] as unknown as { total: number })?.total ?? 0)
+      }
       await upsertRecurringTemplateInTx(tx, userId, {
         concepte: data.concepte ?? currentTx.concepte,
-        import_trs: data.import_trs ?? currentTx.import_trs,
+        import_trs: mergedImport,
+        user_import: mergedImport - splitTotal,
         compte_id: data.compte_id !== undefined ? (data.compte_id ?? null) : currentTx.compte_id,
         categoria_id: data.categoria_id !== undefined ? (data.categoria_id ?? null) : currentTx.categoria_id,
         tipus: mergedTipus as "ingres" | "despesa",
@@ -378,7 +392,7 @@ export async function updateTransaction(
   }
 }
 
-export async function deleteTransaction(id: string, userId: string): Promise<void> {
+export async function deleteTransaction(id: string, userId: string, preserveTemplate = false): Promise<void> {
   const db = getDb()
   const tx = await db.transaction("write")
 
@@ -413,7 +427,7 @@ export async function deleteTransaction(id: string, userId: string): Promise<voi
     })
 
     // Si la transacció era recurrent, netegem el template
-    if (currentTx.recurrent) {
+    if (!preserveTemplate && currentTx.recurrent) {
       await deleteRecurringTemplateInTx(
         tx, userId,
         currentTx.concepte, currentTx.compte_id, currentTx.categoria_id, currentTx.tipus,

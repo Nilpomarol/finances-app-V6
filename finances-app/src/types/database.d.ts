@@ -93,6 +93,7 @@ export interface RecurringTemplate {
   user_id: string
   concepte: string
   import_trs: number
+  user_import: number | null
   compte_id: string | null
   categoria_id: string | null
   tipus: "ingres" | "despesa"
@@ -100,6 +101,17 @@ export interface RecurringTemplate {
   notes: string | null
   pagat_per_id: string | null
   darrer_mes_gestionat: string | null
+  data_inici: number | null
+  data_modificacio: number
+  eliminat: boolean
+}
+
+export interface RecurringSkip {
+  id: string
+  template_id: string
+  user_id: string
+  year: number
+  month: number
   data_modificacio: number
   eliminat: boolean
 }

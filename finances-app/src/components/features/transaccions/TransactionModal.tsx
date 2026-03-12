@@ -96,12 +96,13 @@ interface TransactionModalProps {
   onSuccess?: () => void
   defaultEventId?: string | null
   defaultDate?: number
+  initialValues?: Partial<TransactionFormValues>
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function TransactionModal({
   isOpen, onClose, transactionToEdit, accounts, categories, people = [], events = [], onSuccess,
-  defaultEventId, defaultDate,
+  defaultEventId, defaultDate, initialValues,
 }: TransactionModalProps) {
   const { toast } = useToast()
   const user_id = useAuthStore((state) => state.userId)
@@ -176,6 +177,7 @@ export default function TransactionModal({
         ...defaultValues,
         data: defaultDate ?? now(),
         esdeveniment_id: defaultEventId ?? null,
+        ...initialValues,
       })
       setAvailableTags([])
     }

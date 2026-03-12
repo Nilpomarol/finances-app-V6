@@ -27,6 +27,26 @@ async function runMigrations(client: Client): Promise<void> {
         eliminat INTEGER NOT NULL DEFAULT 0
       )`,
     },
+    {
+      name: "add-user-import-to-recurring-templates",
+      sql: `ALTER TABLE recurring_templates ADD COLUMN user_import REAL`,
+    },
+    {
+      name: "add-data-inici-to-recurring-templates",
+      sql: `ALTER TABLE recurring_templates ADD COLUMN data_inici INTEGER`,
+    },
+    {
+      name: "create-recurring-skips",
+      sql: `CREATE TABLE IF NOT EXISTS recurring_skips (
+        id TEXT PRIMARY KEY,
+        template_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        year INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        data_modificacio INTEGER NOT NULL,
+        eliminat INTEGER NOT NULL DEFAULT 0
+      )`,
+    },
   ]
 
   for (const migration of migrations) {
