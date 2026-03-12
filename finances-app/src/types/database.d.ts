@@ -88,6 +88,22 @@ export interface Transaction {
   eliminat: boolean
 }
 
+export interface RecurringTemplate {
+  id: string
+  user_id: string
+  concepte: string
+  import_trs: number
+  compte_id: string | null
+  categoria_id: string | null
+  tipus: "ingres" | "despesa"
+  dia_del_mes: number
+  notes: string | null
+  pagat_per_id: string | null
+  darrer_mes_gestionat: string | null
+  data_modificacio: number
+  eliminat: boolean
+}
+
 export interface TransactionSplit {
   id: string
   transaccio_id: string

@@ -4,6 +4,8 @@ import { Toaster } from "sonner"
 import AuthGuard from "@/components/features/auth/AuthGuard"
 import Sidebar from "@/components/layout/Sidebar"
 import MobileNav from "@/components/layout/MobileNav"
+import { useRecurringPrompt } from "@/hooks/useRecurringPrompt"
+import { RecurringPromptModal } from "@/components/features/recurrents/RecurringPromptModal"
 
 // Importacions necessàries per carregar les dades de la BD
 import { useAuthStore } from "@/store/authStore"
@@ -26,6 +28,9 @@ export default function Layout() {
   const [categories, setCategories] = useState<Category[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [events, setEvents] = useState<Event[]>([])
+
+  // Prompt de recurrents pendents
+  const { pendingTemplates, showModal, setShowModal, removeTemplate } = useRecurringPrompt(userId)
   // 2. Anem a buscar els comptes i categories un cop l'usuari és vàlid
   // 2. Anem a buscar les dades cada cop que l'usuari és vàlid o S'OBRE EL MODAL
   useEffect(() => {
@@ -64,12 +69,22 @@ export default function Layout() {
             events={events}
             onSuccess={() => {
               setShowTransactionModal(false)
-              // Aquí, si estiguessis al Dashboard, potser voldries que es refresquessin
-              // les dades. Al ser el Layout, amb tancar-lo n'hi ha prou per ara.
-              // Si hi ha problemes de refresc a les pàgines, implementarem un event global més endavant!
             }}
           />
         </Suspense>
+
+        {/* Modal de recurrents pendents */}
+        {userId && (
+          <RecurringPromptModal
+            isOpen={showModal}
+            templates={pendingTemplates}
+            accounts={accounts}
+            categories={categories}
+            userId={userId}
+            onRemoveTemplate={removeTemplate}
+            onClose={() => setShowModal(false)}
+          />
+        )}
       </div>
       <Toaster />
     </AuthGuard>

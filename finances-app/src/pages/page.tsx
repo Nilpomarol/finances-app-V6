@@ -84,6 +84,13 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    const handler = () => setRefreshKey(k => k + 1)
+    window.addEventListener("finances:refresc", handler)
+    return () => window.removeEventListener("finances:refresc", handler)
+  }, [])
 
   useEffect(() => {
     if (!userId) return
@@ -109,7 +116,7 @@ export default function DashboardPage() {
       setPeople(ppl)
       setIsLoading(false)
     })
-  }, [userId])
+  }, [userId, refreshKey])
 
   const nomMesActual = useMemo(() => {
     const fmt = new Intl.DateTimeFormat("ca-ES", { month: "long", year: "numeric" })

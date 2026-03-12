@@ -128,6 +128,10 @@ export default function TransaccionsPage() {
 
   useEffect(() => { setPage(0) }, [filterCompte, filterCategoria, filterTipus, filterEsdeveniment, search])
   useEffect(() => { loadTransactions() }, [loadTransactions])
+  useEffect(() => {
+    window.addEventListener("finances:refresc", loadTransactions)
+    return () => window.removeEventListener("finances:refresc", loadTransactions)
+  }, [loadTransactions])
 
   const totalPages = Math.max(1, Math.ceil(allTransactions.length / PAGE_SIZE))
   const transactions = useMemo(

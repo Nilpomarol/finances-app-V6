@@ -25,7 +25,8 @@ export default function SettleUpModal({
 }: SettleUpModalProps) {
   const { userId } = useAuthStore()
   const [targetAccountId, setTargetAccountId] = useState("")
-  const [amount, setAmount] = useState(Math.round(Math.abs(person.balance) * 100) / 100)
+  const [amountStr, setAmountStr] = useState<string>(String(Math.round(Math.abs(person.balance) * 100) / 100))
+  const amount = parseFloat(amountStr) || 0
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // balance > 0 → they owe you → INGRES; balance < 0 → you owe them → DESPESA
@@ -93,12 +94,25 @@ export default function SettleUpModal({
             <div className="flex items-center gap-2">
               <span className="text-sm text-slate-400 dark:text-slate-500 font-medium">€</span>
               <input
-                type="number"
+                type="text"
                 inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(Math.round(Number(e.target.value) * 100) / 100)}
+                placeholder="0"
+                value={amountStr}
+                onFocus={() => {
+                  if (!amountStr || amountStr === "0") setAmountStr("")
+                }}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(",", ".")
+                  if (raw === "" || /^\d*\.?\d*$/.test(raw)) setAmountStr(raw)
+                }}
+                onBlur={() => {
+                  const num = parseFloat(amountStr)
+                  if (isNaN(num)) {
+                    setAmountStr("")
+                  } else {
+                    setAmountStr(String(Math.round(num * 100) / 100))
+                  }
+                }}
                 className="w-full bg-transparent text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 outline-none border-none tabular-nums"
               />
             </div>

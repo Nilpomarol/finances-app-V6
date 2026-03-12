@@ -31,6 +31,13 @@ export default function AnalisiPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("resum")
   const hasLoadedOnce = useRef(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    const handler = () => setRefreshKey(k => k + 1)
+    window.addEventListener("finances:refresc", handler)
+    return () => window.removeEventListener("finances:refresc", handler)
+  }, [])
 
   // Fetch current period data + metadata
   useEffect(() => {
@@ -65,7 +72,7 @@ export default function AnalisiPage() {
       hasLoadedOnce.current = true
       setIsLoading(false)
     })
-  }, [userId, periode, periodeMode])
+  }, [userId, periode, periodeMode, refreshKey])
 
   // Fetch comparison period independently (re-runs whenever periodeAnterior changes)
   useEffect(() => {

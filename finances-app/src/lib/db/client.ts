@@ -9,6 +9,24 @@ async function runMigrations(client: Client): Promise<void> {
       name: "add-es-fix-to-categories",
       sql: `ALTER TABLE categories ADD COLUMN es_fix INTEGER NOT NULL DEFAULT 0`,
     },
+    {
+      name: "create-recurring-templates",
+      sql: `CREATE TABLE IF NOT EXISTS recurring_templates (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        concepte TEXT NOT NULL,
+        import_trs REAL NOT NULL,
+        compte_id TEXT,
+        categoria_id TEXT,
+        tipus TEXT NOT NULL DEFAULT 'despesa',
+        dia_del_mes INTEGER NOT NULL,
+        notes TEXT,
+        pagat_per_id TEXT,
+        darrer_mes_gestionat TEXT,
+        data_modificacio INTEGER NOT NULL,
+        eliminat INTEGER NOT NULL DEFAULT 0
+      )`,
+    },
   ]
 
   for (const migration of migrations) {

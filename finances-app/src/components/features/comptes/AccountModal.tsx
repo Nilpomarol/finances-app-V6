@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -86,6 +86,16 @@ export default function AccountModal({
     resolver: zodResolver(accountSchema) as Resolver<AccountFormValues>,
     defaultValues,
   })
+
+  const [saldoStr, setSaldoStr] = useState<string>("")
+  const isEditingSaldo = useRef(false)
+
+  const formSaldo = form.watch("saldo")
+  useEffect(() => {
+    if (!isEditingSaldo.current) {
+      setSaldoStr(formSaldo ? String(formSaldo) : "")
+    }
+  }, [formSaldo])
 
   useEffect(() => {
     if (account) {
@@ -212,16 +222,35 @@ export default function AccountModal({
                       <div className="flex items-center gap-2">
                         <span className="text-base sm:text-sm text-slate-400 dark:text-slate-500 font-medium">€</span>
                         <input
-                          type="number"
+                          type="text"
                           inputMode="decimal"
-                          step="0.01"
                           placeholder="0"
                           className="w-full bg-transparent text-base sm:text-sm font-medium text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 outline-none border-none"
-                          value={field.value ?? ""}
-                          onChange={(e) =>
-                            field.onChange(e.target.value === "" ? 0 : Number(e.target.value))
-                          }
-                          onBlur={field.onBlur}
+                          value={saldoStr}
+                          onFocus={() => {
+                            isEditingSaldo.current = true
+                            if (!saldoStr || saldoStr === "0") setSaldoStr("")
+                          }}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(",", ".")
+                            if (raw === "" || /^\d*\.?\d*$/.test(raw)) {
+                              setSaldoStr(raw)
+                              const num = parseFloat(raw)
+                              field.onChange(isNaN(num) ? 0 : num)
+                            }
+                          }}
+                          onBlur={() => {
+                            isEditingSaldo.current = false
+                            const num = parseFloat(saldoStr)
+                            if (isNaN(num)) {
+                              setSaldoStr("")
+                              field.onChange(0)
+                            } else {
+                              setSaldoStr(String(num))
+                              field.onChange(num)
+                            }
+                            field.onBlur()
+                          }}
                           name={field.name}
                           ref={field.ref}
                         />

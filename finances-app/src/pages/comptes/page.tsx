@@ -66,6 +66,11 @@ export default function ComptesPage() {
     loadAccounts()
   }, [loadAccounts])
 
+  useEffect(() => {
+    window.addEventListener("finances:refresc", loadAccounts)
+    return () => window.removeEventListener("finances:refresc", loadAccounts)
+  }, [loadAccounts])
+
   const handleRecalculate = async () => {
     if (!userId) return
     setIsRecalculating(true)

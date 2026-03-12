@@ -1,6 +1,10 @@
 import { getDb } from "../client"
 import { generateId, now } from "@/lib/utils"
 import type { Transaction, TransactionWithRelations, TransactionSplit } from "@/types/database"
+import {
+  upsertRecurringTemplateInTx,
+  deleteRecurringTemplateInTx,
+} from "./recurring-templates"
 
 export interface GetTransactionsOptions {
   userId: string
@@ -205,12 +209,26 @@ export async function createTransaction(
     if (data.deutes && data.deutes.length > 0) {
       for (const split of data.deutes) {
         await tx.execute({
-          sql: `INSERT INTO transaction_splits 
+          sql: `INSERT INTO transaction_splits
                   (id, transaccio_id, persona_id, import_degut, data_modificacio, eliminat)
                 VALUES (?, ?, ?, ?, ?, false)`,
           args: [generateId(), id, split.persona_id, split.import_degut, ts]
         })
       }
+    }
+
+    // SINCRONITZEM EL TEMPLATE RECURRENT
+    if (data.recurrent && (data.tipus === "ingres" || data.tipus === "despesa")) {
+      await upsertRecurringTemplateInTx(tx, userId, {
+        concepte: data.concepte,
+        import_trs: data.import_trs,
+        compte_id: data.compte_id ?? null,
+        categoria_id: data.categoria_id ?? null,
+        tipus: data.tipus,
+        dia_del_mes: new Date(data.data).getDate(),
+        notes: data.notes ?? null,
+        pagat_per_id: data.pagat_per_id ?? null,
+      })
     }
 
     await updateAccountBalances(tx, data.compte_id ?? null, data.compte_desti_id ?? null, userId)
@@ -252,13 +270,26 @@ export async function updateTransaction(
 
   try {
     const current = await tx.execute({
-      sql: `SELECT compte_id, compte_desti_id FROM transactions WHERE id = ? AND user_id = ?`,
+      sql: `SELECT compte_id, compte_desti_id, concepte, import_trs, categoria_id, tipus,
+                   recurrent, data, notes, pagat_per_id
+            FROM transactions WHERE id = ? AND user_id = ?`,
       args: [id, userId],
     })
-    
+
     if (current.rows.length === 0) throw new Error("Transacció no trobada")
 
-    const currentTx = current.rows[0] as unknown as { compte_id: string; compte_desti_id: string | null }
+    const currentTx = current.rows[0] as unknown as {
+      compte_id: string | null
+      compte_desti_id: string | null
+      concepte: string
+      import_trs: number
+      categoria_id: string | null
+      tipus: string
+      recurrent: number
+      data: number
+      notes: string | null
+      pagat_per_id: string | null
+    }
     const ts = now()
 
     await tx.execute({
@@ -310,6 +341,28 @@ export async function updateTransaction(
     if (data.compte_id) affectedAccounts.add(data.compte_id)
     if (data.compte_desti_id) affectedAccounts.add(data.compte_desti_id)
 
+    // SINCRONITZEM EL TEMPLATE RECURRENT
+    const newRecurrent = data.recurrent !== undefined ? data.recurrent : Boolean(currentTx.recurrent)
+    const mergedTipus = (data.tipus ?? currentTx.tipus) as string
+    if (newRecurrent && (mergedTipus === "ingres" || mergedTipus === "despesa")) {
+      await upsertRecurringTemplateInTx(tx, userId, {
+        concepte: data.concepte ?? currentTx.concepte,
+        import_trs: data.import_trs ?? currentTx.import_trs,
+        compte_id: data.compte_id !== undefined ? (data.compte_id ?? null) : currentTx.compte_id,
+        categoria_id: data.categoria_id !== undefined ? (data.categoria_id ?? null) : currentTx.categoria_id,
+        tipus: mergedTipus as "ingres" | "despesa",
+        dia_del_mes: new Date(data.data ?? currentTx.data).getDate(),
+        notes: data.notes !== undefined ? (data.notes ?? null) : currentTx.notes,
+        pagat_per_id: data.pagat_per_id !== undefined ? (data.pagat_per_id ?? null) : currentTx.pagat_per_id,
+      })
+    } else if (data.recurrent === false && Boolean(currentTx.recurrent)) {
+      // Desmarcat com a recurrent: eliminem el template
+      await deleteRecurringTemplateInTx(
+        tx, userId,
+        currentTx.concepte, currentTx.compte_id, currentTx.categoria_id, currentTx.tipus,
+      )
+    }
+
     for (const accountId of affectedAccounts) {
       const newBalance = await recalculateAccountBalance(tx, accountId, userId)
       await tx.execute({
@@ -331,13 +384,21 @@ export async function deleteTransaction(id: string, userId: string): Promise<voi
 
   try {
     const current = await tx.execute({
-      sql: `SELECT compte_id, compte_desti_id FROM transactions WHERE id = ? AND user_id = ?`,
+      sql: `SELECT compte_id, compte_desti_id, concepte, categoria_id, tipus, recurrent
+            FROM transactions WHERE id = ? AND user_id = ?`,
       args: [id, userId],
     })
 
     if (current.rows.length === 0) throw new Error("Transacció no trobada")
 
-    const currentTx = current.rows[0] as unknown as { compte_id: string; compte_desti_id: string | null }
+    const currentTx = current.rows[0] as unknown as {
+      compte_id: string | null
+      compte_desti_id: string | null
+      concepte: string
+      categoria_id: string | null
+      tipus: string
+      recurrent: number
+    }
     const ts = now()
 
     await tx.execute({
@@ -350,6 +411,14 @@ export async function deleteTransaction(id: string, userId: string): Promise<voi
       sql: `UPDATE transaction_splits SET eliminat = true, data_modificacio = ? WHERE transaccio_id = ?`,
       args: [ts, id],
     })
+
+    // Si la transacció era recurrent, netegem el template
+    if (currentTx.recurrent) {
+      await deleteRecurringTemplateInTx(
+        tx, userId,
+        currentTx.concepte, currentTx.compte_id, currentTx.categoria_id, currentTx.tipus,
+      )
+    }
 
     await updateAccountBalances(tx, currentTx.compte_id, currentTx.compte_desti_id, userId)
 
