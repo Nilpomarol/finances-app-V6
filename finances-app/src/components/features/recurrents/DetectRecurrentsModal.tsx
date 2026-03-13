@@ -40,8 +40,11 @@ function detectRecurrentPatterns(txs: TransactionWithRelations[]): RecurrentCand
     let frequency: RecurrentCandidate["frequency"] | null = null
     if (median >= 6 && median <= 9) frequency = "Setmanal"
     else if (median >= 12 && median <= 16) frequency = "Quinzenal"
-    else if (median >= 25 && median <= 35) frequency = "Mensual"
+    else if (median >= 26 && median <= 32) frequency = "Mensual"
     if (!frequency) continue
+
+    // Require at least 3 occurrences for monthly patterns to reduce false positives
+    if (frequency === "Mensual" && instances.length < 3) continue
 
     const avgAmount = instances.reduce((s, t) => s + t.import_trs, 0) / instances.length
     const allAlreadyMarked = instances.every(t => t.recurrent)

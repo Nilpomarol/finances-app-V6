@@ -14,17 +14,50 @@ export interface RecurringTemplateData {
   pagat_per_id: string | null
 }
 
-/** Retorna els templates pendents (no eliminats) per a un usuari.
- *  El filtre de dia i mes es fa al hook per flexibilitat. */
+/**
+ * Retorna els templates pendents per al mes actual.
+ * - Comprova si ja existeix una transacció recurrent equivalent aquest mes (font de veritat).
+ * - Descarta templates que han finalitzat (data_final < primer dia del mes).
+ * - Clamp dia_del_mes al màxim de dies del mes actual per no perdre templates de dia 31.
+ */
 export async function getPendingRecurringTemplates(
   userId: string,
+  diaAvui: number,
+  mesActual: string,
+  firstDayMs: number,
+  lastDayMs: number,
+  daysInCurrentMonth: number,
 ): Promise<RecurringTemplate[]> {
   const db = getDb()
   const result = await db.execute({
-    sql: `SELECT * FROM recurring_templates
-          WHERE user_id = ? AND eliminat = 0
-          ORDER BY concepte ASC`,
-    args: [userId],
+    sql: `SELECT rt.* FROM recurring_templates rt
+          WHERE rt.user_id = ?
+            AND rt.eliminat = 0
+            AND (rt.data_final IS NULL OR rt.data_final >= ?)
+            AND (rt.data_inici IS NULL OR rt.data_inici <= ?)
+            AND CASE WHEN rt.dia_del_mes > ? THEN ? ELSE rt.dia_del_mes END <= ?
+            AND (rt.darrer_mes_gestionat IS NULL OR rt.darrer_mes_gestionat != ?)
+            AND NOT EXISTS (
+              SELECT 1 FROM transactions t
+              WHERE t.user_id = rt.user_id
+                AND t.concepte = rt.concepte
+                AND COALESCE(t.compte_id, '') = COALESCE(rt.compte_id, '')
+                AND COALESCE(t.categoria_id, '') = COALESCE(rt.categoria_id, '')
+                AND t.tipus = rt.tipus
+                AND t.recurrent = 1
+                AND t.eliminat = 0
+                AND t.data >= ?
+                AND t.data <= ?
+            )
+          ORDER BY rt.concepte ASC`,
+    args: [
+      userId,
+      firstDayMs,   // data_final >= primer dia del mes
+      lastDayMs,    // data_inici <= últim dia del mes
+      daysInCurrentMonth, daysInCurrentMonth, diaAvui, // clamped dia_del_mes <= avui
+      mesActual,    // darrer_mes_gestionat != mes actual
+      firstDayMs, lastDayMs, // NOT EXISTS interval
+    ],
   })
   return (result.rows as unknown as RecurringTemplate[]).map(r => ({
     ...r,
@@ -33,15 +66,24 @@ export async function getPendingRecurringTemplates(
 }
 
 /** Upsert dins d'una transacció DB existent (per usar des de transactions.ts).
- *  Identifica el template per (user_id + concepte + compte_id + categoria_id + tipus). */
+ *  Identifica el template per (user_id + concepte + compte_id + categoria_id + tipus + pagat_per_id).
+ *  Valida que dia_del_mes estigui entre 1 i 31. */
 export async function upsertRecurringTemplateInTx(
   tx: any,
   userId: string,
   data: RecurringTemplateData,
 ): Promise<void> {
+  if (
+    !Number.isInteger(data.dia_del_mes) ||
+    data.dia_del_mes < 1 ||
+    data.dia_del_mes > 31
+  ) {
+    throw new Error("dia_del_mes ha de ser un enter entre 1 i 31")
+  }
+
   const ts = now()
 
-  // Comprova si ja existeix un template actiu equivalent
+  // Comprova si ja existeix un template actiu equivalent (inclou pagat_per_id)
   const existing = await tx.execute({
     sql: `SELECT id FROM recurring_templates
           WHERE user_id = ?
@@ -49,9 +91,10 @@ export async function upsertRecurringTemplateInTx(
             AND COALESCE(compte_id, '') = COALESCE(?, '')
             AND COALESCE(categoria_id, '') = COALESCE(?, '')
             AND tipus = ?
+            AND COALESCE(pagat_per_id, '') = COALESCE(?, '')
             AND eliminat = 0
           LIMIT 1`,
-    args: [userId, data.concepte, data.compte_id, data.categoria_id, data.tipus],
+    args: [userId, data.concepte, data.compte_id, data.categoria_id, data.tipus, data.pagat_per_id],
   })
 
   if (existing.rows.length > 0) {
@@ -63,6 +106,7 @@ export async function upsertRecurringTemplateInTx(
                 dia_del_mes = ?,
                 notes = ?,
                 pagat_per_id = ?,
+                data_final = NULL,
                 data_modificacio = ?
             WHERE id = ? AND user_id = ?`,
       args: [data.import_trs, data.user_import, data.dia_del_mes, data.notes, data.pagat_per_id, ts, id, userId],
@@ -71,8 +115,8 @@ export async function upsertRecurringTemplateInTx(
     await tx.execute({
       sql: `INSERT INTO recurring_templates
               (id, user_id, concepte, import_trs, user_import, compte_id, categoria_id, tipus,
-               dia_del_mes, notes, pagat_per_id, darrer_mes_gestionat, data_inici, data_modificacio, eliminat)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 0)`,
+               dia_del_mes, notes, pagat_per_id, darrer_mes_gestionat, data_inici, data_final, data_modificacio, eliminat)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, 0)`,
       args: [
         generateId(), userId, data.concepte, data.import_trs, data.user_import,
         data.compte_id, data.categoria_id, data.tipus,
@@ -82,7 +126,7 @@ export async function upsertRecurringTemplateInTx(
   }
 }
 
-/** Soft-delete del template equivalent (quan es desmarca recurrent). */
+/** Soft-delete del template equivalent (quan es desmarca recurrent d'una transacció). */
 export async function deleteRecurringTemplateInTx(
   tx: any,
   userId: string,
@@ -90,6 +134,7 @@ export async function deleteRecurringTemplateInTx(
   compteId: string | null,
   categoriaId: string | null,
   tipus: string,
+  pagatPerId: string | null = null,
 ): Promise<void> {
   await tx.execute({
     sql: `UPDATE recurring_templates
@@ -99,8 +144,9 @@ export async function deleteRecurringTemplateInTx(
             AND COALESCE(compte_id, '') = COALESCE(?, '')
             AND COALESCE(categoria_id, '') = COALESCE(?, '')
             AND tipus = ?
+            AND COALESCE(pagat_per_id, '') = COALESCE(?, '')
             AND eliminat = 0`,
-    args: [now(), userId, concepte, compteId, categoriaId, tipus],
+    args: [now(), userId, concepte, compteId, categoriaId, tipus, pagatPerId],
   })
 }
 
@@ -120,7 +166,8 @@ export async function markRecurringTemplateHandled(
   })
 }
 
-/** Retorna tots els templates actius ordenats per dia del mes (per a la vista de calendari). */
+/** Retorna tots els templates actius (no eliminats) ordenats per dia del mes.
+ *  Inclou templates amb data_final per a que la vista de calendari pugui filtrar-los. */
 export async function getAllActiveRecurringTemplates(
   userId: string,
 ): Promise<RecurringTemplate[]> {
@@ -152,6 +199,13 @@ export async function updateRecurringTemplate(
   userId: string,
   data: UpdateRecurringTemplateData,
 ): Promise<void> {
+  if (
+    !Number.isInteger(data.dia_del_mes) ||
+    data.dia_del_mes < 1 ||
+    data.dia_del_mes > 31
+  ) {
+    throw new Error("dia_del_mes ha de ser un enter entre 1 i 31")
+  }
   const db = getDb()
   await db.execute({
     sql: `UPDATE recurring_templates
@@ -167,17 +221,26 @@ export async function updateRecurringTemplate(
   })
 }
 
-/** Elimina definitivament el template (Eliminar recurrent). */
+/**
+ * Finalitza el template a partir d'un mes concret (no afecta mesos passats).
+ * Posa data_final = últim ms del mes anterior a (calYear, calMonth 0-indexed).
+ * Exemple: calYear=2026, calMonth=2 → data_final = fi de febrer 2026
+ *          → el template desapareix a partir de març 2026.
+ */
 export async function eliminateRecurringTemplate(
   templateId: string,
   userId: string,
+  calYear: number,
+  calMonth: number, // 0-indexed (com Date.getMonth())
 ): Promise<void> {
+  // last ms of the month BEFORE calMonth
+  const dataFinal = new Date(calYear, calMonth, 0, 23, 59, 59, 999).getTime()
   const db = getDb()
   await db.execute({
     sql: `UPDATE recurring_templates
-          SET eliminat = 1, data_modificacio = ?
+          SET data_final = ?, data_modificacio = ?
           WHERE id = ? AND user_id = ?`,
-    args: [now(), templateId, userId],
+    args: [dataFinal, now(), templateId, userId],
   })
 }
 
@@ -201,23 +264,41 @@ export async function skipRecurringMonth(
   })
 }
 
-/** Syncronitza templates recurrents a partir de transaccions marcades com a recurrents.
- *  - Crea templates nous amb data_inici = primera transacció del grup.
- *  - Actualitza data_inici en templates existents a la primera transacció real. */
+/**
+ * Syncronitza templates recurrents a partir de transaccions marcades com a recurrents.
+ * - Agrupa per (concepte, compte_id, categoria_id, tipus, pagat_per_id).
+ * - Crea templates nous amb data_inici = primera transacció del grup.
+ * - Actualitza templates existents: data_inici, import_trs, user_import, dia_del_mes.
+ * - Neteja data_final per reactivar templates finalitzats manualment.
+ */
 export async function syncRecurringTemplatesFromTransactions(
   userId: string,
 ): Promise<{ created: number }> {
   const db = getDb()
 
   const result = await db.execute({
-    sql: `SELECT concepte, compte_id, categoria_id, tipus, pagat_per_id, notes,
-                 CAST(ROUND(AVG(import_trs)) AS INTEGER) as import_trs,
-                 CAST(ROUND(AVG(CAST(strftime('%d', CAST(data/1000 AS INTEGER), 'unixepoch') AS INTEGER))) AS INTEGER) as dia_del_mes,
-                 MIN(data) as primera_data
-          FROM transactions
-          WHERE user_id = ? AND eliminat = 0 AND recurrent = 1
-            AND tipus IN ('ingres', 'despesa')
-          GROUP BY concepte, COALESCE(compte_id, ''), COALESCE(categoria_id, ''), tipus`,
+    sql: `SELECT
+            t.concepte,
+            t.compte_id,
+            t.categoria_id,
+            t.tipus,
+            t.pagat_per_id,
+            t.notes,
+            CAST(ROUND(AVG(t.import_trs)) AS INTEGER) as import_trs,
+            CAST(ROUND(AVG(
+              t.import_trs - COALESCE(
+                (SELECT SUM(ts.import_degut)
+                 FROM transaction_splits ts
+                 WHERE ts.transaccio_id = t.id AND ts.eliminat = 0),
+                0
+              )
+            )) AS INTEGER) as user_import,
+            CAST(ROUND(AVG(CAST(strftime('%d', CAST(t.data/1000 AS INTEGER), 'unixepoch') AS INTEGER))) AS INTEGER) as dia_del_mes,
+            MIN(t.data) as primera_data
+          FROM transactions t
+          WHERE t.user_id = ? AND t.eliminat = 0 AND t.recurrent = 1
+            AND t.tipus IN ('ingres', 'despesa')
+          GROUP BY t.concepte, COALESCE(t.compte_id, ''), COALESCE(t.categoria_id, ''), t.tipus, COALESCE(t.pagat_per_id, '')`,
     args: [userId],
   })
 
@@ -229,6 +310,7 @@ export async function syncRecurringTemplatesFromTransactions(
     pagat_per_id: string | null
     notes: string | null
     import_trs: number
+    user_import: number
     dia_del_mes: number
     primera_data: number
   }>
@@ -245,21 +327,21 @@ export async function syncRecurringTemplatesFromTransactions(
                 AND COALESCE(compte_id, '') = COALESCE(?, '')
                 AND COALESCE(categoria_id, '') = COALESCE(?, '')
                 AND tipus = ?
+                AND COALESCE(pagat_per_id, '') = COALESCE(?, '')
                 AND eliminat = 0
               LIMIT 1`,
-        args: [userId, row.concepte, row.compte_id, row.categoria_id, row.tipus],
+        args: [userId, row.concepte, row.compte_id, row.categoria_id, row.tipus, row.pagat_per_id],
       })
 
       const ts = now()
       if (existing.rows.length === 0) {
-        // Create new template with data_inici = date of first transaction
         await tx.execute({
           sql: `INSERT INTO recurring_templates
                   (id, user_id, concepte, import_trs, user_import, compte_id, categoria_id, tipus,
-                   dia_del_mes, notes, pagat_per_id, darrer_mes_gestionat, data_inici, data_modificacio, eliminat)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 0)`,
+                   dia_del_mes, notes, pagat_per_id, darrer_mes_gestionat, data_inici, data_final, data_modificacio, eliminat)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, 0)`,
           args: [
-            generateId(), userId, row.concepte, row.import_trs, row.import_trs,
+            generateId(), userId, row.concepte, row.import_trs, row.user_import,
             row.compte_id, row.categoria_id, row.tipus,
             row.dia_del_mes, row.notes, row.pagat_per_id, row.primera_data, ts,
           ],
@@ -267,13 +349,14 @@ export async function syncRecurringTemplatesFromTransactions(
         created++
       } else {
         const existingRow = existing.rows[0] as unknown as { id: string; data_inici: number | null }
-        // Always align data_inici to the first actual transaction date
-        if (existingRow.data_inici !== row.primera_data) {
-          await tx.execute({
-            sql: `UPDATE recurring_templates SET data_inici = ?, data_modificacio = ? WHERE id = ? AND user_id = ?`,
-            args: [row.primera_data, ts, existingRow.id, userId],
-          })
-        }
+        // Update amounts, day, start date, and clear any data_final (reactivate)
+        await tx.execute({
+          sql: `UPDATE recurring_templates
+                SET data_inici = ?, import_trs = ?, user_import = ?, dia_del_mes = ?,
+                    data_final = NULL, data_modificacio = ?
+                WHERE id = ? AND user_id = ?`,
+          args: [row.primera_data, row.import_trs, row.user_import, row.dia_del_mes, ts, existingRow.id, userId],
+        })
       }
     }
 

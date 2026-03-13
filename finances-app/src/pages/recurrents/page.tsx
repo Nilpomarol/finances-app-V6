@@ -151,11 +151,15 @@ export default function RecurrentsPage() {
     getSkippedTemplateIds(userId, calYear, calMonth).then(setSkippedIds)
   }, [userId, calYear, calMonth])
 
-  // Determines if a template should be shown for the viewed month (based on start date)
-  function templateStartedBy(t: RecurringTemplate): boolean {
-    if (!t.data_inici) return true // pre-migration templates always show
-    const lastDayOfMonth = new Date(calYear, calMonth + 1, 0, 23, 59, 59, 999).getTime()
-    return t.data_inici <= lastDayOfMonth
+  /** Determina si un template ha d'aparèixer per al mes (calYear, calMonth).
+   *  - data_inici: el template no existia encara si és posterior al mes visualitzat.
+   *  - data_final: el template va finalitzar si és anterior al primer dia del mes. */
+  function templateActiveForMonth(t: RecurringTemplate): boolean {
+    const firstOfMonth = new Date(calYear, calMonth, 1).getTime()
+    const lastOfMonth = new Date(calYear, calMonth + 1, 0, 23, 59, 59, 999).getTime()
+    if (t.data_inici && t.data_inici > lastOfMonth) return false
+    if (t.data_final != null && t.data_final < firstOfMonth) return false
+    return true
   }
 
   async function handleChipClick(template: RecurringTemplate) {
@@ -222,13 +226,12 @@ export default function RecurrentsPage() {
     if (!userId || !actionTemplate) return
     setActionLoading(true)
     try {
+      // Delete the transaction for this month if it exists (preserve the template)
       if (actionTx) {
-        // Delete transaction (template deletion handled by deleteTransaction)
-        await deleteTransaction(actionTx.id, userId, false)
-      } else {
-        // Only delete the template
-        await eliminateRecurringTemplate(actionTemplate.id, userId)
+        await deleteTransaction(actionTx.id, userId, true)
       }
+      // Stop the template from appearing in this and future months
+      await eliminateRecurringTemplate(actionTemplate.id, userId, calYear, calMonth)
       closeActionSheet()
       load()
     } finally {
@@ -261,7 +264,7 @@ export default function RecurrentsPage() {
   }
 
   const totalMensual = templates
-    .filter(t => t.tipus === "despesa" && templateStartedBy(t) && !skippedIds.has(t.id))
+    .filter(t => t.tipus === "despesa" && templateActiveForMonth(t) && !skippedIds.has(t.id))
     .reduce((s, t) => {
       const net = matchedNetAmounts.get(t.concepte) ?? t.user_import ?? t.import_trs
       return s + net
@@ -283,16 +286,16 @@ export default function RecurrentsPage() {
 
   function templatesForDay(day: number) {
     return templates.filter(t => {
-      if (t.dia_del_mes > daysInMonth) return false
-      if (t.dia_del_mes !== day) return false
-      if (!templateStartedBy(t)) return false
+      const effectiveDay = Math.min(t.dia_del_mes, daysInMonth)
+      if (effectiveDay !== day) return false
+      if (!templateActiveForMonth(t)) return false
       if (skippedIds.has(t.id)) return false
       return true
     })
   }
 
   // Visible templates for mobile list
-  const visibleTemplates = templates.filter(t => templateStartedBy(t) && !skippedIds.has(t.id))
+  const visibleTemplates = templates.filter(t => templateActiveForMonth(t) && !skippedIds.has(t.id))
 
   if (isLoading) return <LoadingSpinner />
 
@@ -408,7 +411,7 @@ export default function RecurrentsPage() {
                   {/* Day badge */}
                   <div className="flex flex-col items-center justify-center w-10 h-10 rounded-xl bg-muted/60 shrink-0">
                     <span className="text-[10px] text-muted-foreground leading-none">dia</span>
-                    <span className="text-sm font-bold leading-tight">{t.dia_del_mes}</span>
+                    <span className="text-sm font-bold leading-tight">{Math.min(t.dia_del_mes, daysInMonth)}</span>
                   </div>
 
                   {/* Info */}
@@ -450,9 +453,9 @@ export default function RecurrentsPage() {
 
       {/* ── Action sheet ──────────────────────────────────────────────────── */}
       {actionTemplate && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeActionSheet} />
-          <div className="relative bg-card rounded-2xl shadow-xl w-full max-w-sm mx-4 mb-4 sm:mb-0 overflow-hidden">
+          <div className="relative bg-card rounded-2xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <div className="flex items-center gap-2">

@@ -47,6 +47,10 @@ async function runMigrations(client: Client): Promise<void> {
         eliminat INTEGER NOT NULL DEFAULT 0
       )`,
     },
+    {
+      name: "add-data-final-to-recurring-templates",
+      sql: `ALTER TABLE recurring_templates ADD COLUMN data_final INTEGER`,
+    },
   ]
 
   for (const migration of migrations) {

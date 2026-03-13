@@ -102,6 +102,7 @@ export interface RecurringTemplate {
   pagat_per_id: string | null
   darrer_mes_gestionat: string | null
   data_inici: number | null
+  data_final: number | null
   data_modificacio: number
   eliminat: boolean
 }

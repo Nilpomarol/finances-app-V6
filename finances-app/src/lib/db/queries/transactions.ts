@@ -374,6 +374,7 @@ export async function updateTransaction(
       await deleteRecurringTemplateInTx(
         tx, userId,
         currentTx.concepte, currentTx.compte_id, currentTx.categoria_id, currentTx.tipus,
+        currentTx.pagat_per_id,
       )
     }
 
@@ -398,7 +399,7 @@ export async function deleteTransaction(id: string, userId: string, preserveTemp
 
   try {
     const current = await tx.execute({
-      sql: `SELECT compte_id, compte_desti_id, concepte, categoria_id, tipus, recurrent
+      sql: `SELECT compte_id, compte_desti_id, concepte, categoria_id, tipus, recurrent, pagat_per_id
             FROM transactions WHERE id = ? AND user_id = ?`,
       args: [id, userId],
     })
@@ -412,6 +413,7 @@ export async function deleteTransaction(id: string, userId: string, preserveTemp
       categoria_id: string | null
       tipus: string
       recurrent: number
+      pagat_per_id: string | null
     }
     const ts = now()
 
@@ -431,6 +433,7 @@ export async function deleteTransaction(id: string, userId: string, preserveTemp
       await deleteRecurringTemplateInTx(
         tx, userId,
         currentTx.concepte, currentTx.compte_id, currentTx.categoria_id, currentTx.tipus,
+        currentTx.pagat_per_id,
       )
     }
 
